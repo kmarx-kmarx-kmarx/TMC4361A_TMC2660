@@ -60,7 +60,7 @@ void setup() {
     TMC4361_sendData(pin_TMC4361_CS[i], TMC4361A_COVER_LOW_WR | 0x80, 0x000E00A0); // SDOFF = 1
     TMC4361_sendData(pin_TMC4361_CS[i], TMC4361A_COVER_LOW_WR | 0x80, 0x000D001F); // current scaling: 0b11111 (max)
     // current open loop scaling
-    TMC4361_sendData(pin_TMC4361_CS[i], TMC4361A_SCALE_VALUES | 0x80, 0x06); //no current for hold or drive
+    TMC4361_sendData(pin_TMC4361_CS[i], TMC4361A_SCALE_VALUES | 0x80, 0x00); //no current for hold or drive
     TMC4361_sendData(pin_TMC4361_CS[i], TMC4361A_CURRENT_CONF | 0x80, 0x00000003); // disable current scaling for hold and drive
     //ramp mode
     TMC4361_sendData(pin_TMC4361_CS[i], TMC4361A_RAMPMODE | 0x80, 0x00000004); // position mode
