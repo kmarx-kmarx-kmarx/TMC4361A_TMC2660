@@ -104,9 +104,8 @@ static const TMCRegisterConstant tmc4361A_RegisterConstants[] =
 
 // API Functions
 // All functions act on one IC given by the TMC4361ATypeDef struct
-#ifdef __cplusplus
- extern "C" {
-#endif
+extern void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length);
+
 // SPI Communication
 void tmc4361A_writeDatagram(TMC4361ATypeDef *tmc4361A, uint8_t address, uint8_t x1, uint8_t x2, uint8_t x3, uint8_t x4);
 void tmc4361A_writeInt(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t value);
@@ -133,8 +132,5 @@ void tmc4361A_moveBy(TMC4361ATypeDef *tmc4361A, int32_t *ticks, uint32_t velocit
 // Helper functions
 int32_t tmc4361A_discardVelocityDecimals(int32_t value);
 uint8_t tmc4361A_calibrateClosedLoop(TMC4361ATypeDef *tmc4361A, uint8_t worker0master1);
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* TMC_IC_TMC4361A_H_ */
