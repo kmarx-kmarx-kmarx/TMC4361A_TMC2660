@@ -68,8 +68,9 @@ void setup() {
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000D001F); // current scaling: 0b11111 (max)
     // current open loop scaling
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_SCALE_VALUES | TMC_WRITE_BIT, 0x00000000); //no current for hold or drive
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK | TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep hold and drive current at 0
-
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current at 0
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current at 0
+    
     enableLimitSwitch(&tmc4361[i]); // enable limit switch reading
   }
 }

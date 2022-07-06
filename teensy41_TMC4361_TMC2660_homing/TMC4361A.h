@@ -104,6 +104,7 @@ static const TMCRegisterConstant tmc4361A_RegisterConstants[] =
 
 // API Functions
 // All functions act on one IC given by the TMC4361ATypeDef struct
+extern void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length);
 
 // SPI Communication
 void tmc4361A_writeDatagram(TMC4361ATypeDef *tmc4361A, uint8_t address, uint8_t x1, uint8_t x2, uint8_t x3, uint8_t x4);
