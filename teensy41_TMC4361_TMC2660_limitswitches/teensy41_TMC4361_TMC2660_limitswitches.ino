@@ -61,16 +61,16 @@ void setup() {
     // SPI configuration
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_SPIOUT_CONF | TMC_WRITE_BIT, 0x4440108A);
     // cover datagram for TMC2660
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR | TMC_WRITE_BIT, 0x000900C3);
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR | TMC_WRITE_BIT, 0x000A0000);
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR | TMC_WRITE_BIT, 0x000C000A);
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR | TMC_WRITE_BIT, 0x000E00A0); // SDOFF = 1
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR | TMC_WRITE_BIT, 0x000D001F); // current scaling: 0b11111 (max)
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000900C3);
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000A0000);
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000C000A);
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000E00A0); // SDOFF = 1
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000D001F); // current scaling: 0b11111 (max)
     // current open loop scaling
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_SCALE_VALUES | TMC_WRITE_BIT, 0x00000000); //no current for hold or drive
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK | TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep hold and drive current at 0
 
-    enableLimitSwitch(pin_TMC4361_CS[i]); // enable limit switch reading
+    enableLimitSwitch(&tmc4361[i]); // enable limit switch reading
   }
 }
 
@@ -83,12 +83,12 @@ void loop() {
     Serial.println("moving " + String(pin_TMC4361_CS[i]));
 
     // Idle until we hit a switch
-    switchstate = readLimitSwitches(pin_TMC4361_CS[i]);
+    switchstate = readLimitSwitches(&tmc4361[i]);
     while (switchstate == 0) {
       // Delay a little
       delay(5);
       // Update switchstate
-      switchstate = readLimitSwitches(pin_TMC4361_CS[i]);
+      switchstate = readLimitSwitches(&tmc4361[i]);
     }
     Serial.print("Hit switch: ");
     if (switchstate == 1) {
@@ -98,13 +98,12 @@ void loop() {
       Serial.println("right");
     }
     prevstate = switchstate;
-    TMC4361_transceiveData(pin_TMC4361_CS[i], TMC4361A_STATUS | TMC_WRITE_BIT, 0);
 
     // Repeat going backwards
-    switchstate = readLimitSwitches(pin_TMC4361_CS[i]);
+    switchstate = readLimitSwitches(&tmc4361[i]);
     while (switchstate == 0 || switchstate == prevstate) {
       delay(5);
-      switchstate = readLimitSwitches(pin_TMC4361_CS[i]);
+      switchstate = readLimitSwitches(&tmc4361[i]);
     }
     Serial.print("Hit switch: ");
     if (switchstate == 1) {
@@ -116,7 +115,7 @@ void loop() {
 
     prevstate = 0;
     switchstate = 0;
-    TMC4361_transceiveData(pin_TMC4361_CS[i], TMC4361A_STATUS | TMC_WRITE_BIT, 0);
+    // Give time to move carriage back to prevent re-triggering the limit switch
     delay(2000);
   }
 }
@@ -142,6 +141,29 @@ void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length) {
   return;
 }
 
+void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat){
+  // Set the bits in dat without disturbing any other bits in the register
+  // Read the bits already there
+  uint32_t datagram = tmc4361A_readInt(tmc4361A, address);
+  // OR with the bits we want to set
+  datagram |= dat;
+  // Write
+  tmc4361A_writeInt(tmc4361A, address | TMC_WRITE_BIT, datagram);
+
+  return;  
+}
+void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat){
+  // Reset the bits in dat without disturbing any other bits in the register
+  // Read the bits already there
+  uint32_t datagram = tmc4361A_readInt(tmc4361A, address);
+  // AND with the bits with the negation of the bits we want to clear
+  datagram &= ~dat;
+  // Write
+  tmc4361A_writeInt(tmc4361A, address | TMC_WRITE_BIT, datagram);
+
+  return;  
+}
+
 void enableLimitSwitch(TMC4361ATypeDef *tmc4361A) {
   // Enable both the left and right limit switches
   // Set whether they are low active (set bit to 0) or high active (1)
@@ -149,19 +171,19 @@ void enableLimitSwitch(TMC4361ATypeDef *tmc4361A) {
   // Enable both left and right stops
   unsigned long en_datagram = TMC4361A_STOP_LEFT_EN_MASK | TMC4361A_STOP_RIGHT_EN_MASK;
 
-  tmc4361A_writeInt(tmc4361A, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, pol_datagram);
-  tmc4361A_writeInt(tmc4361A, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, en_datagram | pol_datagram);
+  tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, pol_datagram);
+  tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, en_datagram);
   
   return;
 }
 
-unsigned long readLimitSwitches(uint8_t pin_CS) {
+uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A) {
   // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
   unsigned long i_datagram = 0;
   unsigned long address = TMC4361A_STATUS;
-  unsigned long datagram = 0;
+  
   // Get the datagram
-  i_datagram = TMC4361_transceiveData(pin_CS, address, datagram);
+  i_datagram = tmc4361A_readInt(tmc4361A, address);
   // Mask off everything except the button states
   i_datagram &= (TMC4361A_STOPL_ACTIVE_F_MASK | TMC4361A_STOPR_ACTIVE_F_MASK);
   // Shift the button state down to bits 0 and 1
