@@ -1,5 +1,8 @@
 /*
-    Implement homing to one of the limit switches
+    Identify which limit switch is the "right" or "left".
+    The motor current is turned off and the carriage can be
+    manually pushed to either limit switch. Check the
+    serial monitor to see which switch was activated.
 
     Author: Kevin Marx
     Created on: 7/5/2022
@@ -64,17 +67,31 @@ void setup() {
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000E00A0); // SDOFF = 1
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_COVER_LOW_WR, 0x000D001F); // current scaling: 0b11111 (max)
     // current open loop scaling
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_SCALE_VALUES | TMC_WRITE_BIT, 0x00000000); //no current for hold or drive
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK | TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep hold and drive current at 0
-
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_SCALE_VALUES | TMC_WRITE_BIT, (0xA0 << TMC4361A_HOLD_SCALE_VAL_SHIFT) +   // Set hold scale value (0 to 255)
+                                                                          (0x90 << TMC4361A_DRV2_SCALE_VAL_SHIFT) +   // Set DRV2 scale  (0 to 255)
+                                                                          (0x90 << TMC4361A_DRV1_SCALE_VAL_SHIFT) +   // Set DRV1 scale  (0 to 255)
+                                                                          (0xA0 << TMC4361A_BOOST_SCALE_VAL_SHIFT))); // Set boost scale (0 to 255)
+                                                                          
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current scale
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_CURRENT_CONF | TMC_WRITE_BIT, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
+    
     enableLimitSwitch(&tmc4361[i]); // enable limit switch reading
   }
 }
 
 void loop() {
   // Run each motor one at a time
-
+  int v = 10;
   for (int i = 0; i < 1; i++) {
+    Serial.println("moving " + String(pin_TMC4361_CS[i]));
+    Serial.println("v = " + String(v));
+    // Start moving
+    tmc4361A_rotate(&tmc4361[i]);  
+    // We have set it up so it stops automatically.
+    // Poll the limit switches to know when to change directions
+    while(readLimitSwitches(&tmc4361[i]) == 0){
+      delay(5);
+    }
     
   }
 }
@@ -134,4 +151,21 @@ void enableLimitSwitch(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, en_datagram);
   
   return;
+}
+
+uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A) {
+  // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
+  unsigned long i_datagram = 0;
+  unsigned long address = TMC4361A_STATUS;
+  
+  // Get the datagram
+  i_datagram = tmc4361A_readInt(tmc4361A, address);
+  // Mask off everything except the button states
+  i_datagram &= (TMC4361A_STOPL_ACTIVE_F_MASK | TMC4361A_STOPR_ACTIVE_F_MASK);
+  // Shift the button state down to bits 0 and 1
+  i_datagram >>= TMC4361A_STOPL_ACTIVE_F_SHIFT;
+  // Get rid of the high bits
+  uint8_t result = i_datagram & 0xff;
+
+  return result;
 }

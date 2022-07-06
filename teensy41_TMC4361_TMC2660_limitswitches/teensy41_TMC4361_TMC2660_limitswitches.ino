@@ -142,7 +142,7 @@ void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length) {
   return;
 }
 
-void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat){
+void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat) {
   // Set the bits in dat without disturbing any other bits in the register
   // Read the bits already there
   uint32_t datagram = tmc4361A_readInt(tmc4361A, address);
@@ -151,9 +151,9 @@ void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat){
   // Write
   tmc4361A_writeInt(tmc4361A, address | TMC_WRITE_BIT, datagram);
 
-  return;  
+  return;
 }
-void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat){
+void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat) {
   // Reset the bits in dat without disturbing any other bits in the register
   // Read the bits already there
   uint32_t datagram = tmc4361A_readInt(tmc4361A, address);
@@ -162,7 +162,7 @@ void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat){
   // Write
   tmc4361A_writeInt(tmc4361A, address | TMC_WRITE_BIT, datagram);
 
-  return;  
+  return;
 }
 
 void enableLimitSwitch(TMC4361ATypeDef *tmc4361A) {
