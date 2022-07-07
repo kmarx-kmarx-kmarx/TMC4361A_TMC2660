@@ -161,6 +161,23 @@ void enableLimitSwitch(TMC4361ATypeDef *tmc4361A) {
   return;
 }
 
+uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A) {
+  // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
+  unsigned long i_datagram = 0;
+  unsigned long address = TMC4361A_STATUS;
+
+  // Get the datagram
+  i_datagram = tmc4361A_readInt(tmc4361A, address);
+  // Mask off everything except the button states
+  i_datagram &= (TMC4361A_STOPL_ACTIVE_F_MASK | TMC4361A_STOPR_ACTIVE_F_MASK);
+  // Shift the button state down to bits 0 and 1
+  i_datagram >>= TMC4361A_STOPL_ACTIVE_F_SHIFT;
+  // Get rid of the high bits
+  uint8_t result = i_datagram & 0xff;
+
+  return result;
+}
+
 uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A) {
   // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
   unsigned long i_datagram = 0;
@@ -182,7 +199,9 @@ int32_t homing_lft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
   // Homing routine
   // First, check if we are already at a limit switch
   uint8_t eventstate = readSwitchEvent(tmc4361);
+  Serial.println(eventstate, BIN);
   if (eventstate == LEFT_SW) {
+    Serial.println("At left switch already!");
     // If we are at the left limit switch, go right until we are no longer hitting it
     tmc4361A_rotate(tmc4361, v_fast);
     while (eventstate != 0) {
@@ -191,16 +210,20 @@ int32_t homing_lft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
       delay(5);
       eventstate = readSwitchEvent(tmc4361);
     }
-    // Wait until we hit the right limit switch
-    while (eventstate == 0) {
+    // Wait until we aren't hitting the left limit switch
+    eventstate = readLimitSwitches(tmc4361);
+    while (eventstate != 0) {
       delay(5);
-      eventstate = readSwitchEvent(tmc4361);
+      eventstate = readLimitSwitches(tmc4361);
     }
+    delay(200);
+    Serial.println("Backed up from left switch");
   }
-  // Now we are either at the right limit switch or somewhere in the middle
+  // Now we are either at the right limit switch, somewhere in the middle, or somewhere close to the left limit switch
   // Enable home tracking
   tmc4361A_setBits(tmc4361, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, TMC4361A_START_HOME_TRACKING_MASK);
   // Move back to the left slowly
+  Serial.println("Moving left");
   tmc4361A_rotate(tmc4361, -v_slow);
   while (eventstate != 0) {
     // Try clearing the "hit right" event 
@@ -208,6 +231,7 @@ int32_t homing_lft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
     delay(5);
     eventstate = readSwitchEvent(tmc4361);
   }
+  Serial.println("Cleared events");
   // Wait until we hit the left limit switch
   while (eventstate == 0) {
     delay(5);
