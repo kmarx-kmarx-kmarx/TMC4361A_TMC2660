@@ -1,11 +1,9 @@
 /*
-    Identify which limit switch is the "right" or "left".
-    The motor current is turned off and the carriage can be
-    manually pushed to either limit switch. Check the
-    serial monitor to see which switch was activated.
+    Find home. Make sure the motor controllers have power before the Teensy to ensure
+    proper startup and prevent undefined behavior
 
     Author: Kevin Marx
-    Created on: 7/5/2022
+    Created on: 7/7/2022
 */
 
 #include "TMC4361A.h" // These files come from the TCM4361A manufacturer
