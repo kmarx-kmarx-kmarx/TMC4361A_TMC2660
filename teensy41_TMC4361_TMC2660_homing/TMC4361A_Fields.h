@@ -303,8 +303,8 @@
 #define TMC4361A_BOOST_SCALE_VAL_SHIFT                    0 // min.: 0, max.: 255, default: 0
 #define TMC4361A_DRV1_SCALE_VAL_MASK                      0xFF00 // SCALE_VALUES // 1st drive current scaling value
 #define TMC4361A_DRV1_SCALE_VAL_SHIFT                     8 // min.: 0, max.: 255, default: 0
-//#define TMC4361A_DRV1_SCALE_VAL_MASK                    0xFF0000 // SCALE_VALUES // 2nd drive current scaling value
-//#define TMC4361A_DRV1_SCALE_VAL_SHIFT                   16 // min.: 0, max.: 255, default: 0
+#define TMC4361A_DRV2_SCALE_VAL_MASK                      0xFF0000 // SCALE_VALUES // 2nd drive current scaling value
+#define TMC4361A_DRV2_SCALE_VAL_SHIFT                     16 // min.: 0, max.: 255, default: 0
 #define TMC4361A_HOLD_SCALE_VAL_MASK                      0xFF000000 // SCALE_VALUES // hold current scaling value
 #define TMC4361A_HOLD_SCALE_VAL_SHIFT                     24 // min.: 0, max.: 255, default: 0
 #define TMC4361A_BOOST_SCALE_VAL_MASK                     0xFF // SCALE_VALUES // Boost current scaling value
