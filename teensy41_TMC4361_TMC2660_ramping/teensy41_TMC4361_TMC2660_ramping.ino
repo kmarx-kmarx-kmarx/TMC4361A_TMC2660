@@ -125,8 +125,16 @@ void setup() {
     // set target position to actual position - no motion initially
     tmc4361A_writeInt(&tmc4361[i], TMC4361A_X_TARGET, tmc4361[i].xmax);
     // ramp mode
-    tmc4361A_setBits(&tmc4361[i], TMC4361A_RAMPMODE, 0b100); // positioning mode, no ramp
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_VMAX, 0x00FFFF00); // max speed
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW1, 0x0000FFFF); // determines the value which increases the absolute acceleration value.
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW2, 0x000FFFFF); // determines the value which decreases the absolute acceleration value.
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW3, 0x000FFFFF); // determines the value which increases the absolute deceleration value.
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW4, 0x0000FFFF); // determines the value which decreases the absolute deceleration value.
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_AMAX, 0x000FFFFF); // max acceleration
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_DMAX, 0x000FFFFF); // max decelleration
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_ASTART, 0); // initial acceleration
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_DFINAL, 0); // final decelleration
+    tmc4361A_writeInt(&tmc4361[i], TMC4361A_VMAX, 0x02FFFF00); // max speed
   }
 }
 
