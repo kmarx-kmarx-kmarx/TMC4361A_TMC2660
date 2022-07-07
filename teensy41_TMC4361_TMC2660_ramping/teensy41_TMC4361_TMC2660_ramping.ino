@@ -135,46 +135,59 @@ void loop() {
   char cmd;
 
   // Wait until serial is available
-  while (!Serial.available()) {
-    delay(10);
+
+  if (Serial.available()) {
+    cmd = Serial.read();
+    if (cmd == 'p') {
+      index = Serial.parseInt();
+      target = Serial.parseInt();
+      // Display error if out of bounds
+      if (index < 0 || index >= N_MOTOR) {
+        Serial.print("Index ");
+        Serial.print(index);
+        Serial.println(" is out of bounds");
+        return;
+      }
+      // Otherwise, read next value
+      // Display error if out of bounds
+      if (target < 0 || target > xrng) {
+        Serial.print("Target ");
+        Serial.print(target);
+        Serial.println(" is out of bounds");
+        return;
+      }
+      Serial.print("Idx: ");
+      Serial.println(index);
+      Serial.print("Target: ");
+      Serial.println(target);
+      Serial.print("Motor CS pin: ");
+      Serial.println(tmc4361[index].config->channel);
+      Serial.print("Motor xmax: ");
+      Serial.println(tmc4361[index].xmax);
+      Serial.print("Motor xmin: ");
+      Serial.println(tmc4361[index].xmin);
+      Serial.print("Actual Target: ");
+      int32_t diff = tmc4361[index].xmax - tmc4361[index].xmin;
+      float scaler = (float)diff / (float)xrng;
+      target = target * scaler + tmc4361[index].xmin;
+      Serial.println(target);
+      Serial.print("Current Position: ");
+      Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_XACTUAL));
+      tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
+    }
   }
 
-  cmd = Serial.read();
-  if (cmd == 'p') {
-    index = Serial.parseInt();
-    target = Serial.parseInt();
-    // Display error if out of bounds
-    if (index < 0 || index >= N_MOTOR) {
-      Serial.print("Index ");
-      Serial.print(index);
-      Serial.println(" is out of bounds");
-      return;
+  // Show results
+  for (int i = 0; i < N_MOTOR; i++) {
+    index  = tmc4361A_readInt(&tmc4361[i], TMC4361A_STATUS); // not sure why but this seems to help...
+    target = tmc4361A_readInt(&tmc4361[i], TMC4361A_EVENTS);
+    target &= TMC4361A_TARGET_REACHED_MASK;
+
+    if (target != 0) {
+      Serial.print("Motor with CS pin ");
+      Serial.print(tmc4361[i].config->channel);
+      Serial.println(" has reached its target");
     }
-    // Otherwise, read next value
-    // Display error if out of bounds
-    if (target < 0 || target > xrng) {
-      Serial.print("Target ");
-      Serial.print(target);
-      Serial.println(" is out of bounds");
-      return;
-    }
-    Serial.print("Idx: ");
-    Serial.println(index);
-    Serial.print("Target: ");
-    Serial.println(target);
-    Serial.print("Motor CS pin: ");
-    Serial.println(tmc4361[index].config->channel);
-    Serial.print("Motor xmax: ");
-    Serial.println(tmc4361[index].xmax);
-    Serial.print("Motor xmin: ");
-    Serial.println(tmc4361[index].xmin);
-    Serial.print("Actual Target: ");
-    int32_t diff = tmc4361[index].xmax - tmc4361[index].xmin;
-    float scaler = (float)diff / (float)xrng;
-    target = target * scaler + tmc4361[index].xmin;
-    Serial.println(target);
-    
-    tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
   }
 }
 
