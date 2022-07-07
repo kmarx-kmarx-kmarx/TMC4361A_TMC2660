@@ -86,7 +86,6 @@ int v = 20000;
 
 void loop() {
   // Run each motor one at a time
-  uint8_t switchstate = 0;
   uint8_t eventstate = 0;
   int32_t x_latch = 0;
   for (int i = 0; i < 1; i++) {
@@ -104,15 +103,14 @@ void loop() {
     }
     Serial.println("Cleared events");
     // Poll the limit switches to know when to change directions
-    switchstate = readSwitchEvent(&tmc4361[i]);
-    while (switchstate == 0) {
+    while (eventstate == 0) {
       delay(5);
-      switchstate = readSwitchEvent(&tmc4361[i]);
+      eventstate = readSwitchEvent(&tmc4361[i]);
     }
     // Get x_latch position
     x_latch = tmc4361A_readInt(&tmc4361[i], TMC4361A_X_LATCH_RD);
     Serial.print("Hit ");
-    if(switchstate == 0b01){
+    if(eventstate == 0b01){
       Serial.print("left");
     }
     else{
