@@ -22,6 +22,9 @@ ConfigurationTypeDef tmc4361_configs[4];
 TMC4361ATypeDef tmc4361[4];
 const uint32_t clk_Hz_TMC4361 = 16000000;
 
+#define LEFT_SW 0b01
+#define RGHT_SW 0b10
+
 void setup() {
   SerialUSB.begin(20000000);
 
@@ -79,48 +82,26 @@ void setup() {
 
     tmc4361A_setBits(&tmc4361[i], TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, TMC4361A_LATCH_X_ON_ACTIVE_L_MASK); // store position when we hit left bound
     tmc4361A_setBits(&tmc4361[i], TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, TMC4361A_LATCH_X_ON_ACTIVE_R_MASK); // store position when we hit right bound
+
+    // enable homing
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, 0b1100 << TMC4361A_HOME_EVENT_SHIFT);// define home behavior
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, TMC4361A_STOP_LEFT_IS_HOME_MASK);    // use stop left as home
+    tmc4361A_setBits(&tmc4361[i], TMC4361A_HOME_SAFETY_MARGIN | TMC_WRITE_BIT, 1 << 6);                         // have a safety margin around home
+  }
+
+  // Home all the motors
+  int32_t x_home[4];
+  for (int i = 0; i < 1; i++) {
+    Serial.print("Homing ");
+    Serial.println(pin_TMC4361_CS[i]);
+    x_home[i] = homing_lft(&tmc4361[i], 10000, 200000);
+    Serial.print("x_home: ");
+    Serial.println(x_home[i]);
   }
 }
 
-int v = 20000;
-
 void loop() {
-  // Run each motor one at a time
-  uint8_t eventstate = 0;
-  int32_t x_latch = 0;
-  for (int i = 0; i < 1; i++) {
-    Serial.println("moving " + String(pin_TMC4361_CS[i]));
-    Serial.println("v = " + String(v));
-    // Start moving
-    tmc4361A_rotate(&tmc4361[i], v);
-    // Clear any events
-    eventstate = readSwitchEvent(&tmc4361[i]);
-    while (eventstate != 0) {
-      // Try clearing the event
-      tmc4361A_rstBits(&tmc4361[i], TMC4361A_EVENTS, (TMC4361A_STOPL_EVENT_MASK | TMC4361A_STOPR_EVENT_MASK));
-      delay(5);
-      eventstate = readSwitchEvent(&tmc4361[i]);
-    }
-    Serial.println("Cleared events");
-    // Poll the limit switches to know when to change directions
-    while (eventstate == 0) {
-      delay(5);
-      eventstate = readSwitchEvent(&tmc4361[i]);
-    }
-    // Get x_latch position
-    x_latch = tmc4361A_readInt(&tmc4361[i], TMC4361A_X_LATCH_RD);
-    Serial.print("Hit ");
-    if(eventstate == 0b01){
-      Serial.print("left");
-    }
-    else{
-      Serial.print("right");
-    }
-    Serial.print(" at XACTUAL = ");
-    Serial.println(x_latch);
-    // We hit a limit; move the opposite direction
-    v = -v;
-  }
+
 }
 
 
@@ -195,4 +176,44 @@ uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A) {
   uint8_t result = i_datagram & 0xff;
 
   return result;
+}
+
+int32_t homing_lft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
+  // Homing routine
+  // First, check if we are already at a limit switch
+  uint8_t eventstate = readSwitchEvent(tmc4361);
+  if (eventstate == LEFT_SW) {
+    // If we are at the left limit switch, go right until we are no longer hitting it
+    tmc4361A_rotate(tmc4361, v_fast);
+    while (eventstate != 0) {
+      // Try clearing the event
+      tmc4361A_rstBits(tmc4361, TMC4361A_EVENTS, (TMC4361A_STOPL_EVENT_MASK | TMC4361A_STOPR_EVENT_MASK));
+      delay(5);
+      eventstate = readSwitchEvent(tmc4361);
+    }
+    // Wait until we hit the right limit switch
+    while (eventstate == 0) {
+      delay(5);
+      eventstate = readSwitchEvent(tmc4361);
+    }
+  }
+  // Now we are either at the right limit switch or somewhere in the middle
+  // Enable home tracking
+  tmc4361A_setBits(tmc4361, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, TMC4361A_START_HOME_TRACKING_MASK);
+  // Move back to the left slowly
+  tmc4361A_rotate(tmc4361, -v_slow);
+  while (eventstate != 0) {
+    // Try clearing the "hit right" event 
+    tmc4361A_rstBits(tmc4361, TMC4361A_EVENTS, (TMC4361A_STOPL_EVENT_MASK | TMC4361A_STOPR_EVENT_MASK));
+    delay(5);
+    eventstate = readSwitchEvent(tmc4361);
+  }
+  // Wait until we hit the left limit switch
+  while (eventstate == 0) {
+    delay(5);
+    eventstate = readSwitchEvent(tmc4361);
+  }
+
+  // Read the latched X_HOME
+  return tmc4361A_readInt(tmc4361, TMC4361A_X_HOME);
 }
