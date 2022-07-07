@@ -82,7 +82,7 @@ void setup() {
   }
 }
 
-int v = 100000;
+int v = 20000;
 
 void loop() {
   // Run each motor one at a time
@@ -104,14 +104,21 @@ void loop() {
     }
     Serial.println("Cleared events");
     // Poll the limit switches to know when to change directions
-    switchstate = readLimitSwitches(&tmc4361[i]);
+    switchstate = readSwitchEvent(&tmc4361[i]);
     while (switchstate == 0) {
       delay(5);
-      switchstate = readLimitSwitches(&tmc4361[i]);
+      switchstate = readSwitchEvent(&tmc4361[i]);
     }
     // Get x_latch position
     x_latch = tmc4361A_readInt(&tmc4361[i], TMC4361A_X_LATCH_RD);
-    Serial.print("Hit limit at XACTUAL = ");
+    Serial.print("Hit ");
+    if(switchstate == 0b01){
+      Serial.print("left");
+    }
+    else{
+      Serial.print("right");
+    }
+    Serial.print(" at XACTUAL = ");
     Serial.println(x_latch);
     // We hit a limit; move the opposite direction
     v = -v;
@@ -173,23 +180,6 @@ void enableLimitSwitch(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF | TMC_WRITE_BIT, en_datagram);
 
   return;
-}
-
-uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A) {
-  // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
-  unsigned long i_datagram = 0;
-  unsigned long address = TMC4361A_STATUS;
-
-  // Get the datagram
-  i_datagram = tmc4361A_readInt(tmc4361A, address);
-  // Mask off everything except the button states
-  i_datagram &= (TMC4361A_STOPL_ACTIVE_F_MASK | TMC4361A_STOPR_ACTIVE_F_MASK);
-  // Shift the button state down to bits 0 and 1
-  i_datagram >>= TMC4361A_STOPL_ACTIVE_F_SHIFT;
-  // Get rid of the high bits
-  uint8_t result = i_datagram & 0xff;
-
-  return result;
 }
 
 uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A) {
