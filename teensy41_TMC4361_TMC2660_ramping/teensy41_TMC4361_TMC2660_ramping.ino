@@ -182,7 +182,7 @@ void loop() {
     index  = tmc4361A_readInt(&tmc4361[i], TMC4361A_STATUS); // not sure why but this seems to help...
     target = tmc4361A_readInt(&tmc4361[i], TMC4361A_EVENTS);
     target &= TMC4361A_TARGET_REACHED_MASK;
-
+    // todo: inconsistent, doesn't always set the target reached bit
     if (target != 0) {
       Serial.print("Motor with CS pin ");
       Serial.print(tmc4361[i].config->channel);
