@@ -33,5 +33,8 @@ void enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t pol_lft, uint8_t pol_r
 void enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t sw, uint8_t pol_lft, uint8_t pol_rht);
 uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A);
 uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A);
+void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast);
+void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow);
+void sRampInit(TMC4361ATypeDef *tmc4361A, int32_t Bow1, int32_t Bow2, int32_t Bow3, int32_t Bow4, int32_t AMAX, int32_t DMAX, int32_t ASTART, int32_t DFINAL, int32_t VMAX);
 
 #endif /* TMC_UTILS_H_ */

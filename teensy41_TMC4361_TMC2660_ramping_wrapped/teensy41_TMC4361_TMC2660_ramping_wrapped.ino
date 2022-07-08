@@ -2,6 +2,9 @@
     Find home, the max position, then take position arguments over serial and ramp to the setpoint.
     This code adds to TMC4361.h and TMC4361.cpp.
 
+    todo: mm input
+    set ramp parameters with physical units
+
     Author: Kevin Marx
     Created on: 7/7/2022
 */
@@ -16,6 +19,9 @@ const uint8_t pin_TMC4361_CS[N_MOTOR] = {41}; //, 36, 35, 34};
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
 
+#define PITCH      2.54 // carriage parameter - 1 rotation is 2.54 mm
+#define MICROSTEPS 256  // motor driver parameter - 1 rotation has 256 microsteps
+
 // Define the CS pin for the 3.3 to 5V level shifter
 const uint8_t pin_DAC80508_CS = 33;
 
@@ -28,8 +34,6 @@ const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, 36, 35, 34};
 // Set calibration behavior
 const int32_t vslow =  50000;
 const int32_t vfast = 200000;
-// Take positions from 1 to xrng over serial monitor, lerp to actual range
-const int32_t xrng  = 100000;
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -78,47 +82,51 @@ void setup() {
     enableHomingLimit(&tmc4361[i], TMC4361_homing_sw[i], lft_sw_pol[i], rht_sw_pol[i]);
   }
 
-  // Home all the motors
-  uint8_t eventstate = 0;
+  // Home all the motors depending on their requirements
+  homeLeft(&tmc4361[0], vslow, vfast);
+  findRight(&tmc4361[0], vslow);
+
+  // Print out motor stats
   for (int i = 0; i < N_MOTOR; i++) {
-    Serial.print("Homing ");
+    Serial.print("Motor ");
+    Serial.print(i);
+    Serial.print(" on pin ");
     Serial.println(pin_TMC4361_CS[i]);
-    homing_lft(&tmc4361[i], vslow, vfast);
-    Serial.print("x_home: ");
+    Serial.print("Min value (microstep): ");
+    Serial.println(tmc4361[i].xmin);
+    Serial.print("Home pos (microstep):  ");
     Serial.println(tmc4361[i].xhome);
-    // Homing left -- xmin and xhome are the same
-    tmc4361[i].xmin = tmc4361[i].xhome;
-    // Find max right value
-    tmc4361A_rotate(&tmc4361[i], vslow);
-    while (eventstate != RGHT_SW) {
-      delay(5);
-      eventstate = readSwitchEvent(&tmc4361[i]);
-    }
-    tmc4361[i].xmax = tmc4361A_readInt(&tmc4361[i], TMC4361A_X_LATCH_RD);
-    Serial.print("xmax: ");
+    Serial.print("Max value (microstep): ");
     Serial.println(tmc4361[i].xmax);
+    Serial.print("Min value (millimeter): ");
+    Serial.println((float)tmc4361[i].xmin * (float)PITCH / MICROSTEPS);
+    Serial.print("Home pos (millimeter):  ");
+    Serial.println((float)tmc4361[i].xhome * (float)PITCH / MICROSTEPS);
+    Serial.print("Max value (millimeter): ");
+    Serial.println((float)tmc4361[i].xmax * (float)PITCH / MICROSTEPS);
   }
 
-  Serial.print("Enter 'p' then a motor index 0 to ");
-  Serial.print(N_MOTOR - 1);
-  Serial.print(" and a number between 0 and ");
-  Serial.print(xrng);
-  Serial.println(" separated by spaces in a single line");
+  Serial.println("Syntax:");
+  Serial.println("[s|S] <index> <setpoint>");
+  Serial.println("s: setpoint is in units microsteps");
+  Serial.println("S: setpoint is in units millimeters");
+  Serial.print("Index selects which motor to move, in range 0 to ");
+  Serial.println(N_MOTOR);
+  Serial.println("Setpoint sets the absolute position along the track in range min to max. ");
+  Serial.println("w <index> [a|A|b|B|m|M] <value>");
+  Serial.println("w: indicates start of write command");
+  Serial.print("Index selects which motor to move, in range 0 to ");
+  Serial.println(N_MOTOR);
+  Serial.println("a: set BOW 1 and BOW 4 (positive jerk when accelerating, negative jerk when decellerating) in pulses per second^3");
+  Serial.println("A: same as 'a' but in units mm per second^3");
+  Serial.println("b: set BOW 2 and BOW 3 (negative jerk when accelerating, positive jerk when decellerating) in pulses per second^3");
+  Serial.println("B: same as 'b' but in units mm per second^3");
+  Serial.println("c: set max velocity in pulses per second * 2^-8");
+  Serial.println("C: same as 'c' but in units mm per second ");
 
   for (int i = 0; i < N_MOTOR; i++) {
-    // set target position to actual position - no motion initially
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_X_TARGET, tmc4361[i].xmax);
-    // ramp mode
-    tmc4361A_setBits(&tmc4361[i], TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW1, 0x0001FFFF); // determines the value which increases the absolute acceleration value.
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW2, 0x001FFFFF); // determines the value which decreases the absolute acceleration value.
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW3, 0x001FFFFF); // determines the value which increases the absolute deceleration value.
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_BOW4, 0x0001FFFF); // determines the value which decreases the absolute deceleration value.
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_AMAX, 0x001FFFFF); // max acceleration
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_DMAX, 0x001FFFFF); // max decelleration
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_ASTART, 0); // initial acceleration
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_DFINAL, 0); // final decelleration
-    tmc4361A_writeInt(&tmc4361[i], TMC4361A_VMAX, 0x04FFFF00); // max speed
+    // initialize ramp with default values
+    sRampInit(&tmc4361[i], 0x01FFFF, 0x1FFFFF, 0x1FFFFF, 0x01FFFF, 0x1FFFFF, 0x1FFFFF, 0, 0, 0x04FFFF00);
   }
 }
 
@@ -130,7 +138,7 @@ void loop() {
 
   if (Serial.available()) {
     cmd = Serial.read();
-    if (cmd == 'p') {
+    if (cmd == 'm') {
       index = Serial.parseInt();
       target = Serial.parseInt();
       // Display error if out of bounds
@@ -142,10 +150,11 @@ void loop() {
       }
       // Otherwise, read next value
       // Display error if out of bounds
-      if (target < 0 || target > xrng) {
+      if (target < 0 || target > tmc4361[index].xmax) {
         Serial.print("Target ");
         Serial.print(target);
-        Serial.println(" is out of bounds");
+        Serial.println(" is out of bounds; max is ");
+        Serial.println(tmc4361[index].xmax);
         return;
       }
       Serial.print("Idx: ");
@@ -158,14 +167,11 @@ void loop() {
       Serial.println(tmc4361[index].xmax);
       Serial.print("Motor xmin: ");
       Serial.println(tmc4361[index].xmin);
-      Serial.print("Actual Target: ");
-      int32_t diff = tmc4361[index].xmax - tmc4361[index].xmin;
-      float scaler = (float)diff / (float)xrng;
-      target = target * scaler + tmc4361[index].xmin;
-      Serial.println(target);
       Serial.print("Current Position: ");
       Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_XACTUAL));
+      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
       tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
+      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
     }
   }
 
@@ -181,53 +187,4 @@ void loop() {
     }
     prevstate[i] = target;
   }
-}
-
-
-void homing_lft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
-  // Homing routine
-  // First, check if we are already at a limit switch
-  uint8_t eventstate = readLimitSwitches(tmc4361);
-  if (eventstate == LEFT_SW) {
-    Serial.println("At left switch already!");
-    // If we are at the left limit switch, go right until we are no longer hitting it
-    tmc4361A_rotate(tmc4361, v_fast);
-    while (eventstate != 0) {
-      // Try clearing the event
-      tmc4361A_rstBits(tmc4361, TMC4361A_EVENTS, (TMC4361A_STOPL_EVENT_MASK | TMC4361A_STOPR_EVENT_MASK));
-      delay(5);
-      eventstate = readSwitchEvent(tmc4361);
-    }
-    // Wait until we aren't hitting the left limit switch
-    eventstate = readLimitSwitches(tmc4361);
-    while (eventstate == LEFT_SW) {
-      delay(5);
-      eventstate = readLimitSwitches(tmc4361);
-    }
-    delay(200);
-    Serial.println("Backed up from left switch");
-  }
-  // Now we are either at the right limit switch, somewhere in the middle, or somewhere close to the left limit switch
-  // Move back to the left slowly
-  Serial.println("Moving left");
-  tmc4361A_rotate(tmc4361, -v_slow);
-  eventstate = readLimitSwitches(tmc4361);
-  while (eventstate == RGHT_SW) {
-    // Try clearing the "hit right" event
-    tmc4361A_rstBits(tmc4361, TMC4361A_EVENTS, (TMC4361A_STOPL_EVENT_MASK | TMC4361A_STOPR_EVENT_MASK));
-    delay(50);
-    eventstate = readLimitSwitches(tmc4361);
-  }
-  Serial.println("Cleared events");
-  // Enable home tracking
-  tmc4361A_setBits(tmc4361, TMC4361A_REFERENCE_CONF, TMC4361A_START_HOME_TRACKING_MASK);
-  // Wait until we hit the left limit switch
-  while (eventstate != LEFT_SW) {
-    delay(5);
-    eventstate = readSwitchEvent(tmc4361);
-  }
-  // Read the latched X_HOME
-  tmc4361->xhome = tmc4361A_readInt(tmc4361, TMC4361A_X_HOME);
-
-  return;
 }

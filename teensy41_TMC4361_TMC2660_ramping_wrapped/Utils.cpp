@@ -144,3 +144,72 @@ uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A) {
 
   return result;
 }
+
+void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
+  // Homing routine
+  // First, check if we are already at a limit switch
+  uint8_t eventstate = readLimitSwitches(tmc4361A);
+  if (eventstate == LEFT_SW) {
+    // move right
+    tmc4361A_rotate(tmc4361A, v_fast);
+    // Wait until we aren't hitting the left limit switch
+    eventstate = readLimitSwitches(tmc4361A);
+    while (eventstate == LEFT_SW) {
+      readSwitchEvent(tmc4361A);
+      delay(5);
+      eventstate = readLimitSwitches(tmc4361A);
+    }
+    delay(200);
+  }
+  // Now we are either at the right limit switch, somewhere in the middle, or somewhere close to the left limit switch
+  // Move back to the left slowly
+  tmc4361A_rotate(tmc4361A, -v_slow);
+  // In case we are at the right switch, clear the event
+  eventstate = readLimitSwitches(tmc4361A);
+  while (eventstate == RGHT_SW) {
+    // Try clearing the "hit right" event
+    readSwitchEvent(tmc4361A);
+    delay(5);
+    eventstate = readLimitSwitches(tmc4361A);
+  }
+  // Wait until we hit the left limit switch
+  while (eventstate != LEFT_SW) {
+    delay(5);
+    eventstate = readSwitchEvent(tmc4361A);
+  }
+  // Set the current position to 0; this is the home position
+  tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, 0);
+  tmc4361A_writeInt(tmc4361A, TMC4361A_X_HOME, 0);
+  tmc4361A->xhome = tmc4361A_readInt(tmc4361A, TMC4361A_X_HOME);
+  tmc4361A->xmin = tmc4361A->xhome;
+
+  return;
+}
+
+void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow) {
+  // Move to the right to find xmax
+  tmc4361A_rotate(tmc4361A, v_slow);
+  uint8_t eventstate;
+  while (eventstate != RGHT_SW) {
+    delay(5);
+    eventstate = readSwitchEvent(tmc4361A );
+  }
+  tmc4361A->xmax = tmc4361A_readInt(tmc4361A, TMC4361A_X_LATCH_RD);
+  tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, tmc4361A->xmax);
+
+  return;
+}
+void sRampInit(TMC4361ATypeDef *tmc4361A, int32_t Bow1, int32_t Bow2, int32_t Bow3, int32_t Bow4, int32_t AMAX, int32_t DMAX, int32_t ASTART, int32_t DFINAL, int32_t VMAX) {
+  tmc4361A_setBits(tmc4361A, TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, Bow1); // determines the value which increases the absolute acceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW2, Bow2); // determines the value which decreases the absolute acceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW3, Bow3); // determines the value which increases the absolute deceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW4, Bow4); // determines the value which decreases the absolute deceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_AMAX, AMAX); // max acceleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_DMAX, DMAX); // max decelleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_ASTART, ASTART); // initial acceleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_DFINAL, DFINAL); // final decelleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, VMAX); // max speed
+
+  return;
+}
