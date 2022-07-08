@@ -183,7 +183,9 @@ void loop() {
       Serial.println(target);
       Serial.print("Current Position: ");
       Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_XACTUAL));
+      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
       tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
+      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
     }
   }
 
