@@ -21,6 +21,8 @@ ConfigurationTypeDef tmc4361_configs[4];
 TMC4361ATypeDef tmc4361[4];
 const uint32_t clk_Hz_TMC4361 = 16000000;
 
+uint8_t prevstate[4] = {1, 1, 1, 1};
+
 #define LEFT_SW 0b01
 #define RGHT_SW 0b10
 
@@ -187,15 +189,14 @@ void loop() {
 
   // Show results
   for (int i = 0; i < N_MOTOR; i++) {
-    index  = tmc4361A_readInt(&tmc4361[i], TMC4361A_STATUS); // not sure why but this seems to help...
-    target = tmc4361A_readInt(&tmc4361[i], TMC4361A_EVENTS);
-    target &= TMC4361A_TARGET_REACHED_MASK;
-    // todo: inconsistent, doesn't always set the target reached bit
-    if (target != 0) {
+    target  = tmc4361A_readInt(&tmc4361[i], TMC4361A_STATUS) & TMC4361A_TARGET_REACHED_MASK;
+    if(target != 0 && prevstate[i] == 0){
       Serial.print("Motor with CS pin ");
       Serial.print(tmc4361[i].config->channel);
       Serial.println(" has reached its target");
     }
+    prevstate[i] = target;
+    // todo: implement using events register
   }
 }
 
