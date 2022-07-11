@@ -121,6 +121,10 @@ void setup() {
   Serial.println("B: same as 'b' but in units mm per second^3");
   Serial.println("c: set max velocity in pulses per second * 2^-8");
   Serial.println("C: same as 'c' but in units mm per second ");
+  Serial.println("p <index>");
+  Serial.println("p: print ramp parameters");
+  Serial.print("Index selects which motor to move, in range 1 to ");
+  Serial.println(N_MOTOR);
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
@@ -158,6 +162,25 @@ void loop() {
       case '\n':
       case ' ':
         break;
+      case 'p':
+        Serial.print("TMC4361A_BOW1: ");
+        Serial.println(tmc4361[index].rampParam[0]);
+        Serial.print("TMC4361A_BOW2: ");
+        Serial.println(tmc4361[index].rampParam[1]);
+        Serial.print("TMC4361A_BOW3: ");
+        Serial.println(tmc4361[index].rampParam[2]);
+        Serial.print("TMC4361A_BOW4: ");
+        Serial.println(tmc4361[index].rampParam[3]);
+        Serial.print("TMC4361A_AMAX: ");
+        Serial.println(tmc4361[index].rampParam[4]);
+        Serial.print("TMC4361A_DMAX: ");
+        Serial.println(tmc4361[index].rampParam[5]);
+        Serial.print("TMC4361A_ASTART: ");
+        Serial.println(tmc4361[index].rampParam[6]);
+        Serial.print("TMC4361A_DFINAL: ");
+        Serial.println(tmc4361[index].rampParam[7]);
+        Serial.print("TMC4361A_VMAX: ");
+        Serial.println(tmc4361[index].rampParam[8]);
       case 'S':
       case 's':
         // Change from mm to microsteps
@@ -190,6 +213,7 @@ void loop() {
         Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS), BIN);
         tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
         Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS), BIN);
+        Serial.print("Time: ");
         Serial.println(millis());
         break;
 
