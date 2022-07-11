@@ -21,6 +21,7 @@ const uint32_t clk_Hz_TMC4361 = 16000000;
 
 #define PITCH      (float)2.54 // carriage parameter - 1 rotation is 2.54 mm
 #define MICROSTEPS 256         // motor driver parameter - 1 rotation has 256 microsteps
+#define STEP_PER_REV 200       // motor parameter - number of steps per full revolution
 
 // Define the CS pin for the 3.3 to 5V level shifter
 const uint8_t pin_DAC80508_CS = 33;
@@ -99,11 +100,11 @@ void setup() {
     Serial.print("Max value (microstep): ");
     Serial.println(tmc4361[i].xmax);
     Serial.print("Min value (millimeter): ");
-    Serial.println((float)tmc4361[i].xmin * (float)PITCH / MICROSTEPS);
+    Serial.println((float)tmc4361[i].xmin * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
     Serial.print("Home pos (millimeter):  ");
-    Serial.println((float)tmc4361[i].xhome * (float)PITCH / MICROSTEPS);
+    Serial.println((float)tmc4361[i].xhome * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
     Serial.print("Max value (millimeter): ");
-    Serial.println((float)tmc4361[i].xmax * (float)PITCH / MICROSTEPS);
+    Serial.println((float)tmc4361[i].xmax * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
   }
 
   Serial.println("Syntax:");
@@ -165,7 +166,7 @@ void loop() {
         // Change from mm to microsteps
         if (cmd == 'S') {
           tmp = Serial.parseFloat();
-          tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+          tmp = tmp * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
           target = tmp;
         }
         else {
@@ -214,7 +215,7 @@ void loop() {
       // change from mm/s^3 to microsteps/s^3
       if (cmd == 'A' || cmd == 'B') {
         tmp = Serial.parseFloat();
-        tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+        tmp = tmp * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
         target = tmp;
       }
       else {
@@ -252,7 +253,7 @@ void loop() {
       if (cmd == 'C') {
         Serial.println("Convert from mm to microsteps");
         tmp = Serial.parseFloat();
-        tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+        tmp = tmp * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
         tmp *= (1 << 8);
         target = tmp;
       }
@@ -290,8 +291,30 @@ void loop() {
       Serial.print("Motor with CS pin ");
       Serial.print(tmc4361[i].config->channel);
       Serial.println(" has reached its target");
+      Serial.print("Time: ");
       Serial.println(millis());
     }
     prevstate[i] = target;
+//    target = tmc4361A_readInt(&tmc4361[i], TMC4361A_EVENTS);
+//    if((target & TMC4361A_STOPL_EVENT_MASK) != 0){
+//      Serial.print("Motor with CS pin ");
+//      Serial.print(tmc4361[i].config->channel);
+//      Serial.println(" has hit the left stop");
+//      Serial.print("Time: ");
+//      Serial.println(millis());
+//    }
+//    else if((target & TMC4361A_STOPR_EVENT_MASK) != 0){
+//      Serial.print("Motor with CS pin ");
+//      Serial.print(tmc4361[i].config->channel);
+//      Serial.println(" has hit the right stop");
+//      Serial.print("Time: ");
+//      Serial.println(millis());
+//    }
+//    else if((target & TMC4361A_EV_STOP_ON_STALL_MASK) != 0){
+//      Serial.print("Motor with CS pin ");
+//      Serial.print(tmc4361[i].config->channel);
+//      Serial.println(" is stalled");
+//      Serial.println(millis());
+//    }
   }
 }

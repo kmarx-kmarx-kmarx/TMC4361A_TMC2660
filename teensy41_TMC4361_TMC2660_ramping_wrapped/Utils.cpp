@@ -147,10 +147,9 @@ uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A) {
 
 void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
   // Homing routine
-  // First, check if we are already at a limit switch
-  // this isn't working properly
+  // First, move right a little, making sure not to hit the right
   uint8_t eventstate = readLimitSwitches(tmc4361A);
-  if (eventstate == LEFT_SW) {
+  if (eventstate != RGHT_SW) {
     // move right
     tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
     tmc4361A_rotate(tmc4361A, v_fast);
@@ -162,6 +161,7 @@ void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast) {
       delay(5);
       eventstate = readLimitSwitches(tmc4361A);
     }
+    // Keep going a little to have clearance from left. It's OK if we hit the right limit switch.
     delay(200);
   }
   // Now we are either at the right limit switch, somewhere in the middle, or somewhere close to the left limit switch
