@@ -2,9 +2,6 @@
     Find home, the max position, then take position arguments over serial and ramp to the setpoint.
     This code adds to TMC4361.h and TMC4361.cpp.
 
-    todo: mm input
-    set ramp parameters with physical units
-
     Author: Kevin Marx
     Created on: 7/7/2022
 */
