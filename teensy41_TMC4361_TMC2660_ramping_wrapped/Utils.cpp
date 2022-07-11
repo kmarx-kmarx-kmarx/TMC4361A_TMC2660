@@ -199,17 +199,17 @@ void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow) {
 
   return;
 }
-void sRampInit(TMC4361ATypeDef *tmc4361A, int32_t Bow1, int32_t Bow2, int32_t Bow3, int32_t Bow4, int32_t AMAX, int32_t DMAX, int32_t ASTART, int32_t DFINAL, int32_t VMAX) {
+void sRampInit(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, Bow1); // determines the value which increases the absolute acceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW2, Bow2); // determines the value which decreases the absolute acceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW3, Bow3); // determines the value which increases the absolute deceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW4, Bow4); // determines the value which decreases the absolute deceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_AMAX, AMAX); // max acceleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_DMAX, DMAX); // max decelleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_ASTART, ASTART); // initial acceleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_DFINAL, DFINAL); // final decelleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, VMAX); // max speed
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, tmc4361A->rampParam[0]); // determines the value which increases the absolute acceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW2, tmc4361A->rampParam[1]); // determines the value which decreases the absolute acceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW3, tmc4361A->rampParam[2]); // determines the value which increases the absolute deceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW4, tmc4361A->rampParam[3]); // determines the value which decreases the absolute deceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_AMAX, tmc4361A->rampParam[4]); // max acceleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_DMAX, tmc4361A->rampParam[5]); // max decelleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_ASTART, tmc4361A->rampParam[6]); // initial acceleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_DFINAL, tmc4361A->rampParam[7]); // final decelleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, tmc4361A->rampParam[8]); // max speed
 
   return;
 }

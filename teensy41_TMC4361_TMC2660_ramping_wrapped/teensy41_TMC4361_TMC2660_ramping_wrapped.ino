@@ -19,8 +19,8 @@ const uint8_t pin_TMC4361_CS[N_MOTOR] = {41}; //, 36, 35, 34};
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
 
-#define PITCH      2.54 // carriage parameter - 1 rotation is 2.54 mm
-#define MICROSTEPS 256  // motor driver parameter - 1 rotation has 256 microsteps
+#define PITCH      (float)2.54 // carriage parameter - 1 rotation is 2.54 mm
+#define MICROSTEPS 256         // motor driver parameter - 1 rotation has 256 microsteps
 
 // Define the CS pin for the 3.3 to 5V level shifter
 const uint8_t pin_DAC80508_CS = 33;
@@ -43,7 +43,7 @@ uint8_t prevstate[N_MOTOR] = {1}; //, 1, 1, 1};
 
 void setup() {
   SerialUSB.begin(20000000);
-
+  Serial.setTimeout(200);
   // Supply 3.3V to the level shifter. Future revisions will have power hardwired
   pinMode(0, OUTPUT);
   pinMode(1, OUTPUT);
@@ -110,12 +110,12 @@ void setup() {
   Serial.println("[s|S] <index> <setpoint>");
   Serial.println("s: setpoint is in units microsteps");
   Serial.println("S: setpoint is in units millimeters");
-  Serial.print("Index selects which motor to move, in range 0 to ");
+  Serial.print("Index selects which motor to move, in range 1 to ");
   Serial.println(N_MOTOR);
   Serial.println("Setpoint sets the absolute position along the track in range min to max. ");
   Serial.println("w <index> [a|A|b|B|m|M] <value>");
   Serial.println("w: indicates start of write command");
-  Serial.print("Index selects which motor to move, in range 0 to ");
+  Serial.print("Index selects which motor to move, in range 1 to ");
   Serial.println(N_MOTOR);
   Serial.println("a: set BOW 1 and BOW 4 (positive jerk when accelerating, negative jerk when decellerating) in pulses per second^3");
   Serial.println("A: same as 'a' but in units mm per second^3");
@@ -126,54 +126,176 @@ void setup() {
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
-    sRampInit(&tmc4361[i], 0x01FFFF, 0x1FFFFF, 0x1FFFFF, 0x01FFFF, 0x1FFFFF, 0x1FFFFF, 0, 0, 0x04FFFF00);
+    tmc4361[i].rampParam[0] = 0x01FFFF;
+    tmc4361[i].rampParam[1] = 0x1FFFFF;
+    tmc4361[i].rampParam[2] = 0x1FFFFF;
+    tmc4361[i].rampParam[3] = 0x01FFFF;
+    tmc4361[i].rampParam[4] = 0x1FFFFF;
+    tmc4361[i].rampParam[5] = 0x1FFFFF;
+    tmc4361[i].rampParam[6] = 0;
+    tmc4361[i].rampParam[7] = 0;
+    tmc4361[i].rampParam[8] = 0x04FFFF00;
+
+    sRampInit(&tmc4361[i]);
   }
 }
 
 void loop() {
   int32_t index, target;
+  float tmp;
   char cmd;
 
   // Wait until serial is available
-
   if (Serial.available()) {
     cmd = Serial.read();
-    if (cmd == 'm') {
-      index = Serial.parseInt();
-      target = Serial.parseInt();
-      // Display error if out of bounds
-      if (index < 0 || index >= N_MOTOR) {
-        Serial.print("Index ");
-        Serial.print(index);
-        Serial.println(" is out of bounds");
-        return;
-      }
-      // Otherwise, read next value
-      // Display error if out of bounds
-      if (target < 0 || target > tmc4361[index].xmax) {
-        Serial.print("Target ");
-        Serial.print(target);
-        Serial.println(" is out of bounds; max is ");
-        Serial.println(tmc4361[index].xmax);
-        return;
-      }
-      Serial.print("Idx: ");
-      Serial.println(index);
-      Serial.print("Target: ");
-      Serial.println(target);
-      Serial.print("Motor CS pin: ");
-      Serial.println(tmc4361[index].config->channel);
-      Serial.print("Motor xmax: ");
-      Serial.println(tmc4361[index].xmax);
-      Serial.print("Motor xmin: ");
-      Serial.println(tmc4361[index].xmin);
-      Serial.print("Current Position: ");
-      Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_XACTUAL));
-      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
-      tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
-      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
+    index = Serial.parseInt();
+    // Parse index first; if parseInt times out, index = 0
+    if (index <= 0 || index > N_MOTOR) {
+      Serial.println("Index OOB or timeout");
+      return;
+    }
+    index--;
+    // Parse cmd
+    switch (cmd) {
+      case '\n':
+      case ' ':
+        break;
+      case 'S':
+      case 's':
+        // Change from mm to microsteps
+        if (cmd == 'S') {
+          tmp = Serial.parseFloat();
+          tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+          target = tmp;
+        }
+        else {
+          target = Serial.parseInt();
+        }
+        // Check if in bounds
+        if (target < tmc4361[index].xmin || target > tmc4361[index].xmax) {
+          Serial.println("Target OOB");
+          return;
+        }
+        // Go to target
+        tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
+        tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
+        tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
+        break;
+
+      case 'w':
+        // If we have a write command, store the command for processing later
+        Serial.read();       // Read and throw out the space
+        cmd = Serial.read(); // Store the command
+        break;
+      default:
+        Serial.println("Not recognized");
     }
   }
+
+  // Next, process the write command
+  switch (cmd) {
+    case 'a':
+    case 'A':
+      // change from mm/s^3 to microsteps/s^3
+      if (cmd == 'A') {
+        tmp = Serial.parseFloat();
+        tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+        target = tmp;
+      }
+      else {
+        target = Serial.parseInt();
+      }
+      // Set the bow parameters - bow 1 and bow 4; indices 0 and 3
+      tmc4361[index].rampParam[0] = target;
+      tmc4361[index].rampParam[3] = target;
+      // Set ramp
+      sRampInit(&tmc4361[index]);
+      Serial.print("Set bows 1 and 4 to ");
+      Serial.println(target);
+      break;
+
+    case 'b':
+    case 'B':
+      // change from mm/s^3 to microsteps/s^3
+      if (cmd == 'B') {
+        tmp = Serial.parseFloat();
+        tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+        target = tmp;
+      }
+      else {
+        target = Serial.parseInt();
+      }
+      // Set the bow parameters - bow 2 and bow 3; indices 1 and 2
+      tmc4361[index].rampParam[1] = target;
+      tmc4361[index].rampParam[2] = target;
+      // Set ramp
+      sRampInit(&tmc4361[index]);
+      Serial.print("Set bows 2 and 3 to ");
+      Serial.println(target);
+      break;
+
+    case 'm':
+    case 'M':
+      // change from mm/s to microsteps/s * 2^-8
+      if (cmd == 'B') {
+        tmp = Serial.parseFloat();
+        tmp *= (int32_t)(1<<8);
+        tmp = tmp * ((float)(MICROSTEPS)) / ((float)(PITCH));
+        target = tmp;
+      }
+      else {
+        target = Serial.parseInt();
+      }
+      // Set the VMAX parameter
+      tmc4361[index].rampParam[8] = target;
+      // Set ramp
+      sRampInit(&tmc4361[index]);
+      Serial.print("Set VMAX to ");
+      Serial.println(target);
+      break;
+    case 'S':
+    case 's':
+    default:
+      break;
+  }
+
+  //
+  //    if (cmd == 'm') {
+  //      index = Serial.parseInt();
+  //      target = Serial.parseInt();
+  //      // Display error if out of bounds
+  //      if (index < 0 || index >= N_MOTOR) {
+  //        Serial.print("Index ");
+  //        Serial.print(index);
+  //        Serial.println(" is out of bounds");
+  //        return;
+  //      }
+  //      // Otherwise, read next value
+  //      // Display error if out of bounds
+  //      if (target < 0 || target > tmc4361[index].xmax) {
+  //        Serial.print("Target ");
+  //        Serial.print(target);
+  //        Serial.println(" is out of bounds; max is ");
+  //        Serial.println(tmc4361[index].xmax);
+  //        return;
+  //      }
+  //      Serial.print("Idx: ");
+  //      Serial.println(index);
+  //      Serial.print("Target: ");
+  //      Serial.println(target);
+  //      Serial.print("Motor CS pin: ");
+  //      Serial.println(tmc4361[index].config->channel);
+  //      Serial.print("Motor xmax: ");
+  //      Serial.println(tmc4361[index].xmax);
+  //      Serial.print("Motor xmin: ");
+  //      Serial.println(tmc4361[index].xmin);
+  //      Serial.print("Current Position: ");
+  //      Serial.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_XACTUAL));
+  //      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
+  //      tmc4361A_writeInt(&tmc4361[index], TMC4361A_X_TARGET, target);
+  //      tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS);
+  //    }
+  //  }
 
   // Show results
   for (int i = 0; i < N_MOTOR; i++) {

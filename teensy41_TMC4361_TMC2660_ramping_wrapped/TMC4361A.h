@@ -19,6 +19,8 @@
 #define TMC4361A_FIELD_WRITE(tdef, address, mask, shift, value) \
 	(tmc4361A_writeInt(tdef, address, FIELD_SET(tmc4361A_readInt(tdef, address), mask, shift, value)))
 
+#define N_PARAM 9
+
 // Typedefs
 typedef struct
 {
@@ -31,6 +33,7 @@ typedef struct
   int32_t xmin;
   int32_t xmax;
   int32_t xhome;
+  int32_t rampParam[N_PARAM];
 	//TMotorConfig motorConfig;
 	//TClosedLoopConfig closedLoopConfig;
 	uint8_t status;
