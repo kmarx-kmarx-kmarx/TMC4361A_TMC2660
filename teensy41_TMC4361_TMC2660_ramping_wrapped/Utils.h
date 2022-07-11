@@ -17,6 +17,9 @@
 #define LEFT_SW 0b01
 #define RGHT_SW 0b10
 
+#define BOWMAX 0x1FFFFFF   // (1<<24 - 1) 
+
+
 // Current Scale Values
 #define TCM2660_CSCALE           0x1F  // Current scale value on the TCM2660, ranges from 0x00 to 0x1F
 #define TMC4361A_HOLD_SCALE_VAL  0xFF  // 0 to 255 
