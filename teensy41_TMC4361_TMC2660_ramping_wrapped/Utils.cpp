@@ -202,17 +202,120 @@ void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow) {
 
   return;
 }
+
 void sRampInit(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, tmc4361A->rampParam[0]); // determines the value which increases the absolute acceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW2, tmc4361A->rampParam[1]); // determines the value which decreases the absolute acceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW3, tmc4361A->rampParam[2]); // determines the value which increases the absolute deceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW4, tmc4361A->rampParam[3]); // determines the value which decreases the absolute deceleration value.
-  tmc4361A_writeInt(tmc4361A, TMC4361A_AMAX, tmc4361A->rampParam[4]); // max acceleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_DMAX, tmc4361A->rampParam[5]); // max decelleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_ASTART, tmc4361A->rampParam[6]); // initial acceleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_DFINAL, tmc4361A->rampParam[7]); // final decelleration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, tmc4361A->rampParam[8]); // max speed
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, tmc4361A->rampParam[BOW1_IDX]); // determines the value which increases the absolute acceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW2, tmc4361A->rampParam[BOW2_IDX]); // determines the value which decreases the absolute acceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW3, tmc4361A->rampParam[BOW3_IDX]); // determines the value which increases the absolute deceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_BOW4, tmc4361A->rampParam[BOW4_IDX]); // determines the value which decreases the absolute deceleration value.
+  tmc4361A_writeInt(tmc4361A, TMC4361A_AMAX, tmc4361A->rampParam[AMAX_IDX]); // max acceleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_DMAX, tmc4361A->rampParam[DMAX_IDX]); // max decelleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_ASTART, tmc4361A->rampParam[ASTART_IDX]); // initial acceleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_DFINAL, tmc4361A->rampParam[DFINAL_IDX]); // final decelleration
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, tmc4361A->rampParam[VMAX_IDX]); // max speed
 
   return;
+}
+
+void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
+  // Ensure idx is in range
+  if (idx >= N_PARAM) {
+    return;
+  }
+
+  tmc4361A->rampParam[idx] = param;
+  sRampInit(tmc4361A);
+
+  return;
+}
+
+void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
+  setSRampParam(tmc4361A, VMAX_IDX, velocity);
+  return;
+}
+
+int8_t setAccelerationMax(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
+  if (acceleration > ((1 << 22) - 1)) {
+    return ERR_OUT_OF_RANGE;
+  }
+  // Calculate what the jerks should be given amax and vmax
+  // Minimize the time a = amax under the constraint BOW1 = BOW2 = BOW3 = BOW4
+  float bowval = (float)acceleration * (float)acceleration / (float)tmc4361A->rampParam[VMAX_IDX];
+  uint32_t bow = bowval;
+  bow = min((1 << 24) - 1, bow);
+
+  tmc4361A->rampParam[BOW1_IDX] = bow;
+  tmc4361A->rampParam[BOW2_IDX] = bow;
+  tmc4361A->rampParam[BOW3_IDX] = bow;
+  tmc4361A->rampParam[BOW4_IDX] = bow;
+  tmc4361A->rampParam[AMAX_IDX] = acceleration;
+  tmc4361A->rampParam[DMAX_IDX] = acceleration;
+
+  sRampInit(tmc4361A);
+
+  return NO_ERR;
+}
+int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
+  if (x_pos < tmc4361A->xmin || x_pos > tmc4361A->xmax) {
+    return ERR_OUT_OF_RANGE;
+  }
+  // Read events before and after to clear the register
+  tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
+  tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
+  tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
+  // Read X_ACTUAL to get it to refresh
+  tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);
+
+  return NO_ERR;
+}
+int8_t move(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
+  int32_t current = currentPosition(tmc4361A);
+  int32_t target = current + x_pos;
+  
+  return moveTo(tmc4361A, target);
+}
+int32_t currentPosition(TMC4361ATypeDef *tmc4361A){
+  return tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);
+}
+int32_t targetPosition(TMC4361ATypeDef *tmc4361A){
+  return tmc4361A_readInt(tmc4361A, TMC4361A_X_TARGET);
+}
+void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position){
+  int32_t current = currentPosition(tmc4361A); 
+  int32_t dif = position - current;
+  // change motor parameters on the teensy
+  tmc4361A->xmax -= dif;
+  tmc4361A->xmin -= dif;
+  tmc4361A->xhome-= dif;
+  // change motor parameters on the driver
+  tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, position);
+
+  return;
+}
+void stop(TMC4361ATypeDef *tmc4361A){
+  move(tmc4361A, 0);
+  return;
+}
+bool isRunning(TMC4361ATypeDef *tmc4361A){
+  uint32_t stat_reg = tmc4361A_readInt(tmc4361A, TMC4361A_STATUS);
+  
+  // We aren't running if target is reached OR (velocity = 0 and acceleration == 0)
+  if(stat_reg & TMC4361A_TARGET_REACHED_MASK != 0){
+    return true;
+  }
+  stat_reg &= (TMC4361A_VEL_STATE_F_MASK | TMC4361A_RAMP_STATE_F_MASK); 
+  if(stat_reg == 0){
+    return true;
+  }
+
+  // Otherwise, return false
+  return false;
+}
+int32_t mmToMicrosteps(float mm){
+  return mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
+}
+float   microstepsTomm(int32_t microsteps){
+  float temp = microsteps * ((float)(PITCH)) / ((float)(MICROSTEPS * STEP_PER_REV));
+  return temp;
 }

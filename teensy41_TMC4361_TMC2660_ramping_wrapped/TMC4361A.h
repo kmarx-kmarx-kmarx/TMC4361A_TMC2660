@@ -13,13 +13,25 @@
 #include "TMC4361A_Constants.h"
 #include "TMC4361A_Fields.h"
 
+// Constants for indexing ramp parameter array
+#define N_PARAM 9
+#define BOW1_IDX   0
+#define BOW2_IDX   1
+#define BOW3_IDX   2
+#define BOW4_IDX   3
+#define AMAX_IDX   4
+#define DMAX_IDX   5
+#define ASTART_IDX 6
+#define DFINAL_IDX 7
+#define VMAX_IDX   8
+
+
 // Helper macros
 #define TMC4361A_FIELD_READ(tdef, address, mask, shift) \
 	FIELD_GET(tmc4361A_readInt(tdef, address), mask, shift)
 #define TMC4361A_FIELD_WRITE(tdef, address, mask, shift, value) \
 	(tmc4361A_writeInt(tdef, address, FIELD_SET(tmc4361A_readInt(tdef, address), mask, shift, value)))
 
-#define N_PARAM 9
 
 // Typedefs
 typedef struct

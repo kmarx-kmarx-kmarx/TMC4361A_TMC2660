@@ -16,10 +16,6 @@ const uint8_t pin_TMC4361_CS[N_MOTOR] = {41}; //, 36, 35, 34};
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
 
-#define PITCH      (float)2.54 // carriage parameter - 1 rotation is 2.54 mm
-#define MICROSTEPS 256         // motor driver parameter - 1 rotation has 256 microsteps
-#define STEP_PER_REV 200       // motor parameter - number of steps per full revolution
-
 // Define the CS pin for the 3.3 to 5V level shifter
 const uint8_t pin_DAC80508_CS = 33;
 
@@ -125,18 +121,30 @@ void setup() {
   Serial.println("p: print ramp parameters");
   Serial.print("Index selects which motor to move, in range 1 to ");
   Serial.println(N_MOTOR);
+  Serial.println("[x|X] <index>");
+  Serial.println("x: Output in units microsteps");
+  Serial.println("X: Output in units millimeters");
+  Serial.print("Index selects which motor to move, in range 1 to ");
+  Serial.println(N_MOTOR);
+  Serial.println("Print out the current position of the specified motor");
+  Serial.println("[t|T] <index>");
+  Serial.println("t: Output in units microsteps");
+  Serial.println("T: Output in units millimeters");
+  Serial.print("Index selects which motor to move, in range 1 to ");
+  Serial.println(N_MOTOR);
+  Serial.println("Print out the target position of the specified motor");
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
-    tmc4361[i].rampParam[0] = 0x01FFFF;
-    tmc4361[i].rampParam[1] = 0x1FFFFF;
-    tmc4361[i].rampParam[2] = 0x1FFFFF;
-    tmc4361[i].rampParam[3] = 0x01FFFF;
-    tmc4361[i].rampParam[4] = 0x1FFFFF;
-    tmc4361[i].rampParam[5] = 0x1FFFFF;
-    tmc4361[i].rampParam[6] = 0;
-    tmc4361[i].rampParam[7] = 0;
-    tmc4361[i].rampParam[8] = 0x04FFFF00;
+    tmc4361[i].rampParam[BOW1_IDX] = 0x01FFFF;
+    tmc4361[i].rampParam[BOW2_IDX] = 0x1FFFFF;
+    tmc4361[i].rampParam[BOW3_IDX] = 0x1FFFFF;
+    tmc4361[i].rampParam[BOW4_IDX] = 0x01FFFF;
+    tmc4361[i].rampParam[AMAX_IDX] = 0x1FFFFF;
+    tmc4361[i].rampParam[DMAX_IDX] = 0x1FFFFF;
+    tmc4361[i].rampParam[ASTART_IDX] = 0;
+    tmc4361[i].rampParam[DFINAL_IDX] = 0;
+    tmc4361[i].rampParam[VMAX_IDX] = 0x04FFFF00;
 
     sRampInit(&tmc4361[i]);
   }
@@ -164,23 +172,23 @@ void loop() {
         break;
       case 'p':
         Serial.print("TMC4361A_BOW1: ");
-        Serial.println(tmc4361[index].rampParam[0]);
+        Serial.println(tmc4361[index].rampParam[BOW1_IDX]);
         Serial.print("TMC4361A_BOW2: ");
-        Serial.println(tmc4361[index].rampParam[1]);
+        Serial.println(tmc4361[index].rampParam[BOW2_IDX]);
         Serial.print("TMC4361A_BOW3: ");
-        Serial.println(tmc4361[index].rampParam[2]);
+        Serial.println(tmc4361[index].rampParam[BOW3_IDX]);
         Serial.print("TMC4361A_BOW4: ");
-        Serial.println(tmc4361[index].rampParam[3]);
+        Serial.println(tmc4361[index].rampParam[BOW4_IDX]);
         Serial.print("TMC4361A_AMAX: ");
-        Serial.println(tmc4361[index].rampParam[4]);
+        Serial.println(tmc4361[index].rampParam[AMAX_IDX]);
         Serial.print("TMC4361A_DMAX: ");
-        Serial.println(tmc4361[index].rampParam[5]);
+        Serial.println(tmc4361[index].rampParam[DMAX_IDX]);
         Serial.print("TMC4361A_ASTART: ");
-        Serial.println(tmc4361[index].rampParam[6]);
+        Serial.println(tmc4361[index].rampParam[ASTART_IDX]);
         Serial.print("TMC4361A_DFINAL: ");
-        Serial.println(tmc4361[index].rampParam[7]);
+        Serial.println(tmc4361[index].rampParam[DFINAL_IDX]);
         Serial.print("TMC4361A_VMAX: ");
-        Serial.println(tmc4361[index].rampParam[8]);
+        Serial.println(tmc4361[index].rampParam[VMAX_IDX]);
       case 'S':
       case 's':
         // Change from mm to microsteps
@@ -252,18 +260,17 @@ void loop() {
       }
       if (cmd == 'a' || cmd == 'A') {
         // Set the bow parameters - bow 1 and bow 4; indices 0 and 3
-        tmc4361[index].rampParam[0] = target;
-        tmc4361[index].rampParam[3] = target;
+
+        setSRampParam(&tmc4361[index], BOW1_IDX, target);
+        setSRampParam(&tmc4361[index], BOW4_IDX, target);
         Serial.print("Set bows 1 and 4");
       }
       else {
         // Set the bow parameters - bow 2 and bow 3; indices 1 and 2
-        tmc4361[index].rampParam[1] = target;
-        tmc4361[index].rampParam[2] = target;
+        setSRampParam(&tmc4361[index], BOW2_IDX, target);
+        setSRampParam(&tmc4361[index], BOW3_IDX, target);
         Serial.print("Set bows 1 and 4");
       }
-      // Set ramp
-      sRampInit(&tmc4361[index]);
 
       break;
 
@@ -283,22 +290,18 @@ void loop() {
       }
       Serial.print("The target is ");
       Serial.println(target);
-      
-      if (abs(target) > (1<<8)*(clk_Hz_TMC4361 / 4)) {
+
+      if (abs(target) > (1 << 8) * (clk_Hz_TMC4361 / 4)) {
         Serial.print("Target too high, must be below ");
-        Serial.println((1<<8)*clk_Hz_TMC4361 / 4);
+        Serial.println((1 << 8)*clk_Hz_TMC4361 / 4);
         break;
       }
 
       // Set the VMAX parameter
-      tmc4361[index].rampParam[8] = target;
-      // Set ramp
-      sRampInit(&tmc4361[index]);
+      setSRampParam(&tmc4361[index], VMAX_IDX, target);
       Serial.print("Set VMAX to ");
-      Serial.println(tmc4361[index].rampParam[8]);
+      Serial.println(tmc4361[index].rampParam[VMAX_IDX]);
       break;
-    case 'S':
-    case 's':
     default:
       break;
   }
@@ -316,26 +319,5 @@ void loop() {
       Serial.println(millis());
     }
     prevstate[i] = target;
-//    target = tmc4361A_readInt(&tmc4361[i], TMC4361A_EVENTS);
-//    if((target & TMC4361A_STOPL_EVENT_MASK) != 0){
-//      Serial.print("Motor with CS pin ");
-//      Serial.print(tmc4361[i].config->channel);
-//      Serial.println(" has hit the left stop");
-//      Serial.print("Time: ");
-//      Serial.println(millis());
-//    }
-//    else if((target & TMC4361A_STOPR_EVENT_MASK) != 0){
-//      Serial.print("Motor with CS pin ");
-//      Serial.print(tmc4361[i].config->channel);
-//      Serial.println(" has hit the right stop");
-//      Serial.print("Time: ");
-//      Serial.println(millis());
-//    }
-//    else if((target & TMC4361A_EV_STOP_ON_STALL_MASK) != 0){
-//      Serial.print("Motor with CS pin ");
-//      Serial.print(tmc4361[i].config->channel);
-//      Serial.println(" is stalled");
-//      Serial.println(millis());
-//    }
   }
 }
