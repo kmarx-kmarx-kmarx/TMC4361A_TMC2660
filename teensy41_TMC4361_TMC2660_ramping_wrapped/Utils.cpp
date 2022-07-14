@@ -1,4 +1,34 @@
+/*
+   Utils.cpp
+   This file contains higher-level functions for interacting with the TMC4362A.
+   Some functions are low-level helpers and do not need to be accessed directly by the user
+    User-facing functions:
+      tcm4361A_tcm2660_init:   Initialize the TCM4361A and TCM2660
+      setMaxSpeed:             Write the target velocity to the TCM4361A in units microsteps per second
+      setMaxAcceleration:      Write the maximum acceleration in units microsteps per second squared
+      moveTo:                  Move to the target absolute position in units microsteps
+      move:                    Move to a position relative to the current position in units microsteps
+      currentPosition:         Return the current position in units microsteps
+      targetPosition:          Return the target position in units microsteps
+      setCurrentPosition:      Set the current position to a specific value in units microsteps
+      stop:                    Halt operation by setting the target position to the current position
+      isRunning:               Returns true if the motor is moving
+      mmToMicrosteps:          Convert from millimeters to units microsteps
+      microstepsTomm:          Convert from microsteps to units millimeters
+      enableLimitSwitch:       Enables reading from limit switches and using limit switches as automatic stop indicators.
+      enableHomingLimit:       Enables using the limit switch or homing
+      readLimitSwitches:       Read limit switch current state
+
+    For internal use:
+      tmc4361A_readWriteArray: Used for low-level SPI communication with the TMC4361A
+      tmc4361A_setBits:        Implements some of the features of tmc4361A_readWriteCover in an easier to use way; it sets bits in a register without disturbing the other bits
+      tmc4361A_setBits:        Implements some of the features of tmc4361A_readWriteCover in an easier to use way; it clears bits in a register without disturbing the other bits
+      readSwitchEvent:         Read events created by the limit switches
+      sRampInit:               Write all parameters for the s-shaped ramp
+      setSRampParam:           Set and write an individual parameter for the s-shaped ramp
+*/
 #include "Utils.h"
+
 
 void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length) {
   // Initialize SPI transfer
@@ -15,10 +45,10 @@ void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length) {
   return;
 }
 
-void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat) {
+void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   // Set the bits in dat without disturbing any other bits in the register
   // Read the bits already there
-  uint32_t datagram = tmc4361A_readInt(tmc4361A, address);
+  int32_t datagram = tmc4361A_readInt(tmc4361A, address);
   // OR with the bits we want to set
   datagram |= dat;
   // Write
@@ -27,10 +57,10 @@ void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat) 
   return;
 }
 
-void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, uint32_t dat) {
+void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   // Reset the bits in dat without disturbing any other bits in the register
   // Read the bits already there
-  uint32_t datagram = tmc4361A_readInt(tmc4361A, address);
+  int32_t datagram = tmc4361A_readInt(tmc4361A, address);
   // AND with the bits with the negation of the bits we want to clear
   datagram &= ~dat;
   // Write
@@ -231,18 +261,19 @@ void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
 }
 
 void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
+  velocity = tmc4361A_discardVelocityDecimals(velocity);
   setSRampParam(tmc4361A, VMAX_IDX, velocity);
   return;
 }
 
-int8_t setAccelerationMax(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
+int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
   if (acceleration > ((1 << 22) - 1)) {
     return ERR_OUT_OF_RANGE;
   }
   // Calculate what the jerks should be given amax and vmax
   // Minimize the time a = amax under the constraint BOW1 = BOW2 = BOW3 = BOW4
   float bowval = (float)acceleration * (float)acceleration / (float)tmc4361A->rampParam[VMAX_IDX];
-  uint32_t bow = bowval;
+  int32_t bow = bowval;
   bow = min((1 << 24) - 1, bow);
 
   tmc4361A->rampParam[BOW1_IDX] = bow;
@@ -257,6 +288,9 @@ int8_t setAccelerationMax(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
   return NO_ERR;
 }
 int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
+  // ensure we are in positioning mode
+
+  TMC4361A_FIELD_WRITE(tmc4361A, TMC4361A_RAMPMODE, TMC4361A_OPERATION_MODE_MASK, TMC4361A_OPERATION_MODE_SHIFT, 1);
   if (x_pos < tmc4361A->xmin || x_pos > tmc4361A->xmax) {
     return ERR_OUT_OF_RANGE;
   }
@@ -272,50 +306,51 @@ int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
 int8_t move(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
   int32_t current = currentPosition(tmc4361A);
   int32_t target = current + x_pos;
-  
+
   return moveTo(tmc4361A, target);
 }
-int32_t currentPosition(TMC4361ATypeDef *tmc4361A){
+int32_t currentPosition(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);
 }
-int32_t targetPosition(TMC4361ATypeDef *tmc4361A){
+int32_t targetPosition(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_X_TARGET);
 }
-void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position){
-  int32_t current = currentPosition(tmc4361A); 
+void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
+  int32_t current = currentPosition(tmc4361A);
   int32_t dif = position - current;
   // change motor parameters on the teensy
   tmc4361A->xmax -= dif;
   tmc4361A->xmin -= dif;
-  tmc4361A->xhome-= dif;
+  tmc4361A->xhome -= dif;
   // change motor parameters on the driver
   tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, position);
 
   return;
 }
-void stop(TMC4361ATypeDef *tmc4361A){
+void stop(TMC4361ATypeDef *tmc4361A) {
   move(tmc4361A, 0);
   return;
 }
-bool isRunning(TMC4361ATypeDef *tmc4361A){
-  uint32_t stat_reg = tmc4361A_readInt(tmc4361A, TMC4361A_STATUS);
-  
+bool isRunning(TMC4361ATypeDef *tmc4361A) {
+  int32_t stat_reg = tmc4361A_readInt(tmc4361A, TMC4361A_STATUS);
+
   // We aren't running if target is reached OR (velocity = 0 and acceleration == 0)
-  if(stat_reg & TMC4361A_TARGET_REACHED_MASK != 0){
+  if (stat_reg & TMC4361A_TARGET_REACHED_MASK != 0) {
     return true;
   }
-  stat_reg &= (TMC4361A_VEL_STATE_F_MASK | TMC4361A_RAMP_STATE_F_MASK); 
-  if(stat_reg == 0){
+  stat_reg &= (TMC4361A_VEL_STATE_F_MASK | TMC4361A_RAMP_STATE_F_MASK);
+  if (stat_reg == 0) {
     return true;
   }
 
   // Otherwise, return false
   return false;
 }
-int32_t mmToMicrosteps(float mm){
+int32_t mmToMicrosteps(float mm) {
   return mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
 }
-float   microstepsTomm(int32_t microsteps){
+
+float   microstepsTomm(int32_t microsteps) {
   float temp = microsteps * ((float)(PITCH)) / ((float)(MICROSTEPS * STEP_PER_REV));
   return temp;
 }

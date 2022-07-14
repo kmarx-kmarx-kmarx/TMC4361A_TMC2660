@@ -1,33 +1,49 @@
 /*
-    Find home, the max position, then take position arguments over serial and ramp to the setpoint.
-    This code adds to TMC4361.h and TMC4361.cpp.
+    teensy41_TMC4361_TMC2660_ramping_wrapped.ino:
+        This project implements positioning-based control on a Teensy 4.1 using the TMC4361A motor controller and TMC2660 motor driver.
+        These 2 ICs have a somewhat complicated API for setup and operation; this project provides a wrapper to make the API easier to use.
+        All functionality is implemented in the .h and .cpp files #included in this project; this file demonstrates their functionality with a human-usable serial interface.
+        This demonstration assumes the motor is set up with two limit switches.
+        To use this demonstration, set the parameters as described below.
+
+     DESCRIPTION: This file sets up and runs the main control loop.
+        setup(): Initialize Serial and communications with the motor controller IC
+        loop():  Read commands over Serial and perform them
+
+    Shared Variables:
+        ConfigurationTypeDef tmc4361_configs: Configurations for the motor controllers
+        TMC4361ATypeDef tmc4361:              Motor structs contain motor state and parameters
+        uint8_t prevstate[N_MOTOR]:           Used for tracking motor position. Future versions of this code will use the TMC4361A EVENTS register instead of tracking state on the Teensy
+
+    Motor Parameters:
+        N_MOTOR: Number of TMC4361A motor controllers connected to the same SPI bus
+        pin_TMC4361_CS[N_MOTOR]: Chip Select pins for each TCM4316A. Each motor controller should have a unique pin
+        pin_TMC4361_CLK: SPI clock pin; the TMC4361A and TMC2660 need lower clock speeds than the Teensy. This is in units Hz.
+        lft_sw_pol[N_MOTOR]: Define left limit switch behaviors for each motor. Set to 1 for active high switches, 0 for active low.
+        rht_sw_pol[N_MOTOR]: Same as above for the right switch
+        TMC4361_homing_sw[N_MOTOR]: Set whether the left or right switch is the homing switch for each motor.
+        vslow: Movement speed in microsteps per second when calibrating. Moing slowly when calibrating gives more accurate results
+
+    Dependencies:
+        TMC4361A.h: Low-level definitions and functions for motor interface
+        Utils.h:    Higher level functions for motor interface
 
     Author: Kevin Marx
     Created on: 7/7/2022
 */
 
-#include "TMC4361A.h" // These files come from the TCM4361A manufacturer
-#include "Utils.h"    // Adds more functionality
+#include "TMC4361A.h"
+#include "Utils.h"
 
-// Define the chip select pins for the TMC4361 connected to the microcontroller
+// Motor Parameters: connect 1 motor
 #define N_MOTOR 1
-const uint8_t pin_TMC4361_CS[N_MOTOR] = {41}; //, 36, 35, 34};
-// Define the clock pin. The clock speed of the TMC4361 is slower than the Teensy's clock speed
+const uint8_t pin_TMC4361_CS[N_MOTOR] = {41}; //, 36, 35, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
-
-// Define the CS pin for the 3.3 to 5V level shifter
-const uint8_t pin_DAC80508_CS = 33;
-
-// define limit switch polarity, 1 for active high, 0 for active low
 const uint8_t lft_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t rht_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
-// define the switchs we are using for homing
-const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, 36, 35, 34};
-
-// Set calibration behavior
+const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, LEFT_SW, LEFT_SW, LEFT_SW};
 const int32_t vslow =  50000;
-const int32_t vfast = 200000;
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -36,19 +52,17 @@ TMC4361ATypeDef tmc4361[N_MOTOR];
 uint8_t prevstate[N_MOTOR] = {1}; //, 1, 1, 1};
 
 void setup() {
+  // Initialize serial on the Teensy
   SerialUSB.begin(20000000);
   Serial.setTimeout(200);
-  // Supply 3.3V to the level shifter. Future revisions will have power hardwired
+  // The Teensy operates at 3.3V while the TMC4361A and TMC2660 operate at 5V
+  // Supply 3.3V to the level shifters. Future board revisions will have power hardwired
   pinMode(0, OUTPUT);
   pinMode(1, OUTPUT);
   digitalWrite(0, HIGH);
   digitalWrite(1, HIGH);
 
-  // CS pin for DAC80508level shifter
-  pinMode(pin_DAC80508_CS, OUTPUT);
-  digitalWrite(pin_DAC80508_CS, HIGH);
-
-  // Clock for TMC4361 and TMC2660
+  // Initialize clock
   pinMode(pin_TMC4361_CLK, OUTPUT);
   analogWriteFrequency(pin_TMC4361_CLK, clk_Hz_TMC4361);
   analogWrite(pin_TMC4361_CLK, 128); // 50% duty
@@ -62,8 +76,9 @@ void setup() {
     digitalWrite(pin_TMC4361_CS[i], HIGH);
   }
 
-  // SPI - included in Utils.h
+  // Initialize SPI - included in Utils.h
   SPI.begin();
+  // Give some time to finish initialization before using the SPI bus
   delayMicroseconds(5000);
 
   // initilize TMC4361 and TMC2660 - turn on functionality
@@ -77,7 +92,7 @@ void setup() {
   }
 
   // Home all the motors depending on their requirements
-  homeLeft(&tmc4361[0], vslow, vfast);
+  homeLeft(&tmc4361[0], vslow, vslow * 4);
   findRight(&tmc4361[0], vslow);
 
   // Print out motor stats
@@ -99,7 +114,7 @@ void setup() {
     Serial.print("Max value (millimeter): ");
     Serial.println((float)tmc4361[i].xmax * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
   }
-
+  // Print serial commands
   Serial.println("Syntax:");
   Serial.println("[s|S] <index> <setpoint>");
   Serial.println("s: setpoint is in units microsteps");

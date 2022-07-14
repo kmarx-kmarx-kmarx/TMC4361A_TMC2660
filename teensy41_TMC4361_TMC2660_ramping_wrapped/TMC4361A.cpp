@@ -1,8 +1,31 @@
 /*
    TMC4361A.c
-
+   This file contains low-level functions for initializing and controlling the TMC4361A.
+       tmc4361A_readWriteArray: Connects to external function in Utils.cpp
+       tmc4361A_writeDatagram:  Formats bits, sets shadow register, and writes to the TMC4361A
+       tmc4361A_writeInt:       Takes an int32_t as input and writes it to the TMC4361A
+       tmc4361A_readInt:        Reads from the TMC4361A, sets the shadow register, and formats the bits
+       tmc4361A_readWriteCover: Writes bits to TMC4361A without overwriting the bits we want to keep. Unused.
+       tmc4361A_init:           Initializes TMC4361A structs with default values and the CS pins
+       tmc4361A_fillShadowRegisters: Populate on-MCU shadow registers with default values for debugging. Unused.
+       tmc4361A_reset:          Return TMC4361A structs to default values. Unused.
+       tmc4361A_restore:        Indicate the TMC4361A struct configuration should be restored the next time they are written. Unused.
+       tmc4361A_setRegisterResetState: Set the register reset state. Unused.
+       tmc4361A_setCallback:    Set the callback function. Unused.
+       tmc4361A_writeConfiguration: Write all configuration settings. Unused.
+       tmc4361A_periodicJob:    Constantly run; after "tick" time elapses, it runs the closed loop calibration routine. Unused.
+       tmc4361A_rotate:         Rotate at fixed velocity.
+       tmc4361A_right:          Rotate right at fixed velocity. Unused.
+       tmc4361A_left:           Rotate left at fixed velocity. Unused.
+       tmc4361A_stop:           Stop rotation. Unused.
+       tmc4361A_moveTo:         Go to absolute position. Unused, instead use moveTo defined in Utils.
+       tmc4361A_moveBy:         Move a relative amount. Unused, instead use move defined in Utils.
+       tmc4361A_discardVelocityDecimals: Properly format the velocity for writing to the TCM4361A.
+       tmc4361A_moveToNextFullstep: Move from the current microstep to the next full step. Unused.
+       tmc4361A_calibrateClosedLoop: Calibrates closed loop using a linear encoder. Unused.
+       
     Created on: 18.07.2017
-        Author: LK
+        Author: LK, with additions from Kevin Marx, 7/14/2022
 */
 
 #include "TMC4361A.h"
