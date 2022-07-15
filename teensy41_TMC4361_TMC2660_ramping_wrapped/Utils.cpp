@@ -29,7 +29,31 @@
 */
 #include "Utils.h"
 
-
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_readWriteArray() sends a number of bytes to a target device over SPI. Functions in TMC4316A.cpp depend on this function.
+  
+  OPERATION:   This function mediates a SPI transaction by first setting the CS pin of the target device low, then sending bytes from an array one at a time over SPI and storing the data back into the original array. Once the transaction is over, the CS pin is brought high again.
+  
+  ARGUMENTS: 
+      uint8_t channel: CS pin number
+      uint8_t *data:   Pointer to data array
+      size_t length:   Number of bytes in the data array
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      uint8_t *data: Values in this array are overwritten 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: SPI.h
+  -----------------------------------------------------------------------------
+*/ 
 void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length) {
   // Initialize SPI transfer
   SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE0));
@@ -45,6 +69,33 @@ void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length) {
   return;
 }
 
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_setBits() sets bits in a register without affecting the other bits.
+  
+  OPERATION:   We first read the register data then OR the register with the bits we want to set. Then, it writes the data to the address.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint8_t address:           Address of the register we want to write to
+      int32_t dat:               Data we want to write to the array
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      int32_t datagram: Used to hold both the data read from the register and the data we want to write to the register
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   // Set the bits in dat without disturbing any other bits in the register
   // Read the bits already there
@@ -57,6 +108,32 @@ void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_rstBits() clears bits in a register without affecting the other bits.
+  
+  OPERATION:   We first read the register data then AND the register with the negation of bits we want to set. Then, it writes the data to the address.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint8_t address:           Address of the register we want to write to
+      int32_t dat:               Data we want to write to the array
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      int32_t datagram: Used to hold both the data read from the register and the data we want to write to the register
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   // Reset the bits in dat without disturbing any other bits in the register
   // Read the bits already there
@@ -69,6 +146,30 @@ void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tcm4361A_tcm2660_init() initializes the TCM4361A and TCM2660
+  
+  OPERATION:   We write several bytes to the two ICs to configure their behaviors.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint32_t clk_Hz_TMC4361:   Clock frequency we are driving the ICs at
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void tcm4361A_tcm2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   // TMC4361
   tmc4361A_writeInt(tmc4361A, TMC4361A_CLK_FREQ, clk_Hz_TMC4361);
@@ -92,14 +193,40 @@ void tcm4361A_tcm2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: enableLimitSwitch() enables the left and right limit switches
+  
+  OPERATION:   We format the switch polarity variables into a datagram and send it to the TCM4361. We then enable position latching when the limit switch is hit
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint8_t pol_lft:           Polarity of the left switch - 0 if active low, 1 if active high
+      uint8_t pol_rht:           Polarity of right
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      uint32_t pol_datagram, en_datagram: store datagrams to write to the TCM4361.
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t pol_lft, uint8_t pol_rht) {
   // Enable both the left and right limit switches
   pol_lft &= 1; // mask off unwanted bits
   pol_rht &= 1;
   // Set whether they are low active (set bit to 0) or high active (1)
-  unsigned long pol_datagram = (pol_lft << TMC4361A_POL_STOP_LEFT_SHIFT) | (pol_rht << TMC4361A_POL_STOP_RIGHT_SHIFT);
+  uint32_t pol_datagram = (pol_lft << TMC4361A_POL_STOP_LEFT_SHIFT) | (pol_rht << TMC4361A_POL_STOP_RIGHT_SHIFT);
   // Enable both left and right stops
-  unsigned long en_datagram = TMC4361A_STOP_LEFT_EN_MASK | TMC4361A_STOP_RIGHT_EN_MASK;
+  uint32_t en_datagram = TMC4361A_STOP_LEFT_EN_MASK | TMC4361A_STOP_RIGHT_EN_MASK;
 
   tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, pol_datagram);
   tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, en_datagram);
@@ -110,6 +237,32 @@ void enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t pol_lft, uint8_t pol_r
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: enableHomingLimit() enables using either the left or right limit switch for homing
+  
+  OPERATION:   We format the switch polarity variables and target switch into a datagram and send it to the TCM4361. We then enable position latching when the limit switch is hit
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint8_t sw:                Which switch we are using for homing - left or right
+      uint8_t pol_lft:           Polarity of the left switch - 0 if active low, 1 if active high
+      uint8_t pol_rht:           Polarity of right
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t sw, uint8_t pol_lft, uint8_t pol_rht) {
   if (sw == LEFT_SW) {
     if (pol_lft != 0) {
@@ -141,13 +294,41 @@ void enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t sw, uint8_t pol_lft, u
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: readLimitSwitches() reads the limit switches and returns their state in the two low bits of a byte.
+                00 - both not pressed
+                01 - left switch pressed
+                10 - right
+                11 - both
+  
+  OPERATION:   We read the status register, mast the irrelevant bits, and shift the relevant bits down
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: 
+      uint8_t result: Byte containing the button state in the last two bits
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      uint32_t i_datagram: data received from the TCM4361A
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A) {
   // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
-  unsigned long i_datagram = 0;
-  unsigned long address = TMC4361A_STATUS;
+  uint32_t i_datagram = 0;
 
   // Get the datagram
-  i_datagram = tmc4361A_readInt(tmc4361A, address);
+  i_datagram = tmc4361A_readInt(tmc4361A, TMC4361A_STATUS);
   // Mask off everything except the button states
   i_datagram &= (TMC4361A_STOPL_ACTIVE_F_MASK | TMC4361A_STOPR_ACTIVE_F_MASK);
   // Shift the button state down to bits 0 and 1
@@ -158,6 +339,35 @@ uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A) {
   return result;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: readLimitSwitches() checks whether there was a switch event and returns their state in the two low bits of a byte.
+                00 - both not pressed
+                01 - left switch pressed
+                10 - right
+                11 - both
+  
+  OPERATION:   We read the events register, mast the irrelevant bits, and shift the relevant bits down
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: 
+      uint8_t result: Byte containing the button state in the last two bits
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      uint32_t i_datagram: data received from the TCM4361A
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A) {
   // Read both limit switches. Set bit 0 if the left switch is pressed and bit 1 if the right switch is pressed
   unsigned long i_datagram = 0;
@@ -233,6 +443,29 @@ void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: sRampInit() writes the ramp parameters to the TMC4361A.
+  
+  OPERATION:   We read the data from the shared struct and write them one at a time to the TCM4361A
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from and written to the struct
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void sRampInit(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
   tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, tmc4361A->rampParam[BOW1_IDX]); // determines the value which increases the absolute acceleration value.
@@ -248,6 +481,31 @@ void sRampInit(TMC4361ATypeDef *tmc4361A) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: setSRampParam() writes a single ramp parameter to the TMC4361A.
+  
+  OPERATION:   We change a variable in the shared struct and call sRampInit() to write the data.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint8_t idx:               Which parameter to change
+      int32_t param:             The new value of the parameter
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from and written to the struct
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
   // Ensure idx is in range
   if (idx >= N_PARAM) {
@@ -260,12 +518,61 @@ void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: setMaxSpeed() writes a single ramp parameter to the TMC4361A.
+  
+  OPERATION:   We first verify the new velocity value is in bounds, then we change the variable in the shared struct and call sRampInit() to write the data.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int32_t velocity:          The velocity in units microsteps per second
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from and written to the struct
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
   velocity = tmc4361A_discardVelocityDecimals(velocity);
   setSRampParam(tmc4361A, VMAX_IDX, velocity);
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: setMaxAcceleration() writes a single ramp parameter to the TMC4361A.
+  
+  OPERATION:   We first verify the new acceleration value is in bounds, then we change the variable in the shared struct. We also change bows 1 through 4 to ensure we hit max acceleration. Then we call sRampInit() to write the data.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int32_t acceleration:      The acceleration in microsteps per second squared
+  
+  RETURNS: 
+      uint8_t err: Return ERR_OUT_OF_RANGE or NO_ERR depending on what happened.
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from and written to the struct
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
   if (acceleration > ((1 << 22) - 1)) {
     return ERR_OUT_OF_RANGE;
@@ -287,6 +594,32 @@ int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
 
   return NO_ERR;
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: moveTo() writes the new setpoint to the TMC4361A.
+  
+  OPERATION:   We first verify the new position value is in bounds, then we clear the event register, send the data to the TMC4613, clear the event register again, and read the current position to refresh it.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int32_t x_pos:             The target position in microsteps
+  
+  RETURNS: 
+      uint8_t err: Return ERR_OUT_OF_RANGE or NO_ERR depending on what happened.
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
   // ensure we are in positioning mode
 
@@ -303,18 +636,122 @@ int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
 
   return NO_ERR;
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: move() writes the new setpoint relative to the current position to the TMC4361A.
+  
+  OPERATION:   We first convert the relative position to an absolute position and call moveTo()
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int32_t x_pos:             The target position in microsteps
+  
+  RETURNS: 
+      uint8_t err: Return ERR_OUT_OF_RANGE or NO_ERR depending on what happened.
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      int32_t current: current position
+      int32_t target:  calculated absolute position
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 int8_t move(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
   int32_t current = currentPosition(tmc4361A);
   int32_t target = current + x_pos;
 
   return moveTo(tmc4361A, target);
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: currentPosition() reads the current position
+  
+  OPERATION:   We read the data in the XACTUAL register
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: 
+      int32_t xpos: The position in units microsteps
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/ 
 int32_t currentPosition(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: targetPosition() reads the target position
+  
+  OPERATION:   We read the data in the X_TARGET register
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: 
+      int32_t xpos: The position in units microsteps
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/
 int32_t targetPosition(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_X_TARGET);
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: setCurrentPosition() overwrites the current position with a new position. This doesn't change the physical position of the motor.
+  
+  OPERATION:   We change the motor driver struct varaibles to reflect the new offset and update the TMC4361A.
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      int32_t current: stores the current position
+      int32_t diff:    stores the difference between the current and target position
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from and written to the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/
 void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
   int32_t current = currentPosition(tmc4361A);
   int32_t dif = position - current;
@@ -324,13 +761,65 @@ void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
   tmc4361A->xhome -= dif;
   // change motor parameters on the driver
   tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, position);
+  // Ensure the motor doesn't move
+  moveTo(tmc4361A, position);
 
   return;
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: stop() halts motor motion
+  
+  OPERATION:   We move the motor to position 0 relative to its current position
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: None
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/
 void stop(TMC4361ATypeDef *tmc4361A) {
   move(tmc4361A, 0);
   return;
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: isRunning() checks whether the motor is moving and returns either true or false
+  
+  OPERATION:   We check if the motor hit its target. If so, we return true. We then check the acceleration and velocity; if they are both zero we also return true. Then, otherwise, return false
+  
+  ARGUMENTS: 
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+  
+  RETURNS: 
+      bool moving: true if moving, false otherwise
+  
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  
+  LOCAL VARIABLES: 
+      int32_t stat_reg: The status register
+  
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct 
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: TCM4316A.h
+  -----------------------------------------------------------------------------
+*/
 bool isRunning(TMC4361ATypeDef *tmc4361A) {
   int32_t stat_reg = tmc4361A_readInt(tmc4361A, TMC4361A_STATUS);
 
@@ -346,10 +835,59 @@ bool isRunning(TMC4361ATypeDef *tmc4361A) {
   // Otherwise, return false
   return false;
 }
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: mmToMicrosteps() convers a position in units mm to a position in units microsteps
+  
+  OPERATION:   We multiply the mm by a conversion factor and cast to int32_t
+  
+  ARGUMENTS: 
+      float mm: posiiton in mm
+  
+  RETURNS: 
+      int32_t microsteps: the position in units microsteps
+  
+  INPUTS / OUTPUTS: None
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: None
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: None
+  -----------------------------------------------------------------------------
+*/
 int32_t mmToMicrosteps(float mm) {
   return mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: microstepsTomm() convers a position in units microsteps to a position in units mm
+  
+  OPERATION:   We cast the microsteps to a float and multiply the microsteps by a conversion factor
+  
+  ARGUMENTS: 
+      int32_t microsteps: the position in units microsteps
+
+  
+  RETURNS: 
+      float mm: posiiton in mm
+
+  
+  INPUTS / OUTPUTS: None
+  
+  LOCAL VARIABLES: None
+  
+  SHARED VARIABLES: None
+  
+  GLOBAL VARIABLES: None
+  
+  DEPENDENCIES: None
+  -----------------------------------------------------------------------------
+*/
 float   microstepsTomm(int32_t microsteps) {
   float temp = microsteps * ((float)(PITCH)) / ((float)(MICROSTEPS * STEP_PER_REV));
   return temp;
