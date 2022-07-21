@@ -14,7 +14,7 @@
        tmc4361A_setCallback:    Set the callback function. Unused.
        tmc4361A_writeConfiguration: Write all configuration settings. Unused.
        tmc4361A_periodicJob:    Constantly run; after "tick" time elapses, it runs the closed loop calibration routine. Unused.
-       tmc4361A_rotate:         Rotate at fixed velocity.
+       tmc4361A_rotate:         Rotate at fixed velocity. Use this for velocity control.
        tmc4361A_right:          Rotate right at fixed velocity. Unused.
        tmc4361A_left:           Rotate left at fixed velocity. Unused.
        tmc4361A_stop:           Stop rotation. Unused.

@@ -19,7 +19,7 @@
 #define STEP_PER_REV 200       // motor parameter - number of steps per full revolution
 
 // Current Scale Values - can modify these
-#define TCM2660_CSCALE           0x1F  // Current scale value on the TCM2660, ranges from 0x00 to 0x1F
+#define TMC2660_CSCALE           0x1F  // Current scale value on the TCM2660, ranges from 0x00 to 0x1F
 #define TMC4361A_HOLD_SCALE_VAL  0xFF  // 0 to 255 
 #define TMC4361A_DRV2_SCALE_VAL  0xFF
 #define TMC4361A_DRV1_SCALE_VAL  0xFF
@@ -31,7 +31,7 @@
 #define ERR_MISC         -2
 
 // Functions for user-facing API
-void tcm4361A_tcm2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361);
+void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361);
 void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast); // todo: generalize
 void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow);                // todo: generalize
 void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
@@ -48,11 +48,15 @@ float   microstepsTomm(int32_t microsteps);
 void enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t pol_lft, uint8_t pol_rht);
 void enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t sw, uint8_t pol_lft, uint8_t pol_rht);
 uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A);
+void setHome(TMC4361ATypeDef *tmc4361A);
+void moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir);
 
 
 // The following does not need to be accessed by the end user
 #define LEFT_SW 0b01
 #define RGHT_SW 0b10
+#define LEFT_DIR -1
+#define RGHT_DIR  1
 #define BOWMAX 0x1FFFFFF   // (1<<24 - 1) 
 
 void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length);
