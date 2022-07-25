@@ -16,8 +16,8 @@
       setCurrentPosition:      Set the current position to a specific value in units microsteps
       stop:                    Halt operation by setting the target position to the current position
       isRunning:               Returns true if the motor is moving
-      x_mmToMicrosteps:        Convert from millimeters to units microsteps for position values
-      x_microstepsTomm:        Convert from microsteps to units millimeters for position values
+      x_mmToMicrosteps:        Convert from millimeters to units microsteps for position and jerk values
+      x_microstepsTomm:        Convert from microsteps to units millimeters for position and jerk values
       v_mmToMicrosteps:        Convert from millimeters to units microsteps for velocity values
       v_microstepsTomm:        Convert from microsteps to units millimeters for velocity values
       a_mmToMicrosteps:        Convert from millimeters to units microsteps for acceleration values
