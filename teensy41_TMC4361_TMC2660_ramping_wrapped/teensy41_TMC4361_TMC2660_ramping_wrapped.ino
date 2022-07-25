@@ -191,54 +191,54 @@ void loop() {
         Serial.print("TMC4361A_BOW1 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW1_IDX]);
         Serial.print(", ");
-        Serial.println(x_microstepsTomm(tmc4361[index].rampParam[BOW1_IDX]));
+        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW1_IDX]));
 
         Serial.print("TMC4361A_BOW2 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW2_IDX]);
         Serial.print(", ");
-        Serial.println(x_microstepsTomm(tmc4361[index].rampParam[BOW2_IDX]));
+        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW2_IDX]));
 
         Serial.print("TMC4361A_BOW3 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW3_IDX]);
         Serial.print(", ");
-        Serial.println(x_microstepsTomm(tmc4361[index].rampParam[BOW3_IDX]));
+        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW3_IDX]));
 
         Serial.print("TMC4361A_BOW4 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW4_IDX]);
         Serial.print(", ");
-        Serial.println(x_microstepsTomm(tmc4361[index].rampParam[BOW4_IDX]));
+        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW4_IDX]));
 
         Serial.print("TMC4361A_AMAX (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[AMAX_IDX]);
         Serial.print(", ");
-        Serial.println(a_microstepsTomm(tmc4361[index].rampParam[AMAX_IDX]));
+        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[AMAX_IDX]));
 
         Serial.print("TMC4361A_DMAX (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[DMAX_IDX]);
         Serial.print(", ");
-        Serial.println(a_microstepsTomm(tmc4361[index].rampParam[DMAX_IDX]));
+        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[DMAX_IDX]));
 
 
         Serial.print("TMC4361A_ASTART (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[ASTART_IDX]);
         Serial.print(", ");
-        Serial.println(a_microstepsTomm(tmc4361[index].rampParam[ASTART_IDX]));
+        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[ASTART_IDX]));
 
         Serial.print("TMC4361A_DFINAL (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[DFINAL_IDX]);
         Serial.print(", ");
-        Serial.println(a_microstepsTomm(tmc4361[index].rampParam[DFINAL_IDX]));
+        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[DFINAL_IDX]));
 
         Serial.print("TMC4361A_VMAX (microsteps/s, mm/s): ");
         Serial.print(tmc4361[index].rampParam[VMAX_IDX]);
         Serial.print(", ");
-        Serial.println(v_microstepsTomm(tmc4361[index].rampParam[VMAX_IDX]));
+        Serial.println(vmicrostepsTomm(tmc4361[index].rampParam[VMAX_IDX]));
         break;
       case 'S': // Movement
       case 's':
         if (cmd == 'S') {
           tmp = Serial.parseFloat();
-          target = x_mmToMicrosteps(tmp);
+          target = xmmToMicrosteps(tmp);
         }
         else {
           target = Serial.parseInt();
@@ -249,7 +249,7 @@ void loop() {
       case 'r':
         if (cmd == 'R') {
           tmp = Serial.parseFloat();
-          target = x_mmToMicrosteps(tmp);
+          target = xmmToMicrosteps(tmp);
         }
         else {
           target = Serial.parseInt();
@@ -262,7 +262,7 @@ void loop() {
         target = currentPosition(&tmc4361[index]);
 
         if (cmd == 'X') {
-          tmp = x_microstepsTomm(target);
+          tmp = xmicrostepsTomm(target);
           Serial.println(tmp);
         }
         else {
@@ -275,7 +275,7 @@ void loop() {
         target = targetPosition(&tmc4361[index]);
 
         if (cmd == 'T') {
-          tmp = x_microstepsTomm(target);
+          tmp = xmicrostepsTomm(target);
           Serial.println(tmp);
         }
         else {
@@ -299,7 +299,7 @@ void loop() {
     case 'a':
       if (cmd == 'A') {
         tmp = Serial.parseFloat();
-        target = a_mmToMicrosteps(tmp);
+        target = ammToMicrosteps(tmp);
       }
       else {
         target = Serial.parseInt();
@@ -311,7 +311,7 @@ void loop() {
     case 'v':
       if (cmd == 'V') {
         tmp = Serial.parseFloat();
-        target = v_mmToMicrosteps(tmp);
+        target = vmmToMicrosteps(tmp);
       }
       else {
         target = Serial.parseInt();

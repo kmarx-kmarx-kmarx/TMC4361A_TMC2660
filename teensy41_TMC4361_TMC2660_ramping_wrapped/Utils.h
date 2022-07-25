@@ -35,6 +35,9 @@ void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361);
 void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast); // todo: generalize
 void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow);                // todo: generalize
 void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
+void setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
+int32_t speed(TMC4361ATypeDef *tmc4361A);
+int32_t acceleration(TMC4361ATypeDef *tmc4361A);
 int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration);
 int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos);
 int8_t move(TMC4361ATypeDef *tmc4361A, int32_t x_pos);
@@ -43,8 +46,12 @@ int32_t targetPosition(TMC4361ATypeDef *tmc4361A);
 void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position);
 void stop(TMC4361ATypeDef *tmc4361A);
 bool isRunning(TMC4361ATypeDef *tmc4361A);
-int32_t mmToMicrosteps(float mm);
-float   microstepsTomm(int32_t microsteps);
+int32_t xmmToMicrosteps(float mm);
+float   xmicrostepsTomm(int32_t microsteps);
+int32_t vmmToMicrosteps(float mm);
+float   vmicrostepsTomm(int32_t microsteps);
+int32_t ammToMicrosteps(float mm);
+float   amicrostepsTomm(int32_t microsteps);
 void enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t pol_lft, uint8_t pol_rht);
 void enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t sw, uint8_t pol_lft, uint8_t pol_rht);
 uint8_t readLimitSwitches(TMC4361ATypeDef *tmc4361A);

@@ -16,12 +16,12 @@
       setCurrentPosition:      Set the current position to a specific value in units microsteps
       stop:                    Halt operation by setting the target position to the current position
       isRunning:               Returns true if the motor is moving
-      x_mmToMicrosteps:        Convert from millimeters to units microsteps for position and jerk values
-      x_microstepsTomm:        Convert from microsteps to units millimeters for position and jerk values
-      v_mmToMicrosteps:        Convert from millimeters to units microsteps for velocity values
-      v_microstepsTomm:        Convert from microsteps to units millimeters for velocity values
-      a_mmToMicrosteps:        Convert from millimeters to units microsteps for acceleration values
-      a_microstepsTomm:        Convert from microsteps to units millimeters for acceleration values
+      xmmToMicrosteps:        Convert from millimeters to units microsteps for position and jerk values
+      xmicrostepsTomm:        Convert from microsteps to units millimeters for position and jerk values
+      vmmToMicrosteps:        Convert from millimeters to units microsteps for velocity values
+      vmicrostepsTomm:        Convert from microsteps to units millimeters for velocity values
+      ammToMicrosteps:        Convert from millimeters to units microsteps for acceleration values
+      amicrostepsTomm:        Convert from microsteps to units millimeters for acceleration values
       enableLimitSwitch:       Enables reading from limit switches and using limit switches as automatic stop indicators.
       enableHomingLimit:       Enables using the limit switch or homing
       readLimitSwitches:       Read limit switch current state
@@ -624,7 +624,7 @@ void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
   -----------------------------------------------------------------------------
 */
 void setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
-  rotate(tmc4361A, velocity);
+  tmc4361A_rotate(tmc4361A, velocity);
   return;
 }
 
@@ -975,7 +975,7 @@ bool isRunning(TMC4361ATypeDef *tmc4361A) {
 /*
   -----------------------------------------------------------------------------
   DESCRIPTION: The three mmToMicrosteps() functions convers a position in units mm to a position in units microsteps
-               x_mmToMicrosteps() also works for bow jerks
+               xmmToMicrosteps() also works for bow jerks
 
   OPERATION:   We multiply the mm by a conversion factor and cast to int32_t
 
@@ -997,15 +997,15 @@ bool isRunning(TMC4361ATypeDef *tmc4361A) {
   DEPENDENCIES: None
   -----------------------------------------------------------------------------
 */
-int32_t x_mmToMicrosteps(float mm) {
-  int32_t microsteps = mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH))
-                       return microsteps;
+int32_t xmmToMicrosteps(float mm) {
+  int32_t microsteps = mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH));
+  return microsteps;
 }
-int32_t v_mmToMicrosteps(float mm) {
+int32_t vmmToMicrosteps(float mm) {
   int32_t microsteps = (1 << 8) * mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH)); // mult. by 1 << 8 to account for 8 decimal places
   return microsteps;
 }
-int32_t a_mmToMicrosteps(float mm) {
+int32_t ammToMicrosteps(float mm) {
   int32_t microsteps = (1 << 2) * mm * ((float)(MICROSTEPS * STEP_PER_REV)) / ((float)(PITCH)); // mult. by 1 << 2 to account for 2 decimal places
   return microsteps;
 }
@@ -1013,7 +1013,7 @@ int32_t a_mmToMicrosteps(float mm) {
 /*
   -----------------------------------------------------------------------------
   DESCRIPTION: microstepsTomm() convers a position in units microsteps to a position in units mm
-               x_microstepsTomm() also works for bow jerks
+               xmicrostepsTomm() also works for bow jerks
 
   OPERATION:   We cast the microsteps to a float and multiply the microsteps by a conversion factor
 
@@ -1037,15 +1037,15 @@ int32_t a_mmToMicrosteps(float mm) {
   DEPENDENCIES: None
   -----------------------------------------------------------------------------
 */
-float   x_microstepsTomm(int32_t microsteps) {
+float   xmicrostepsTomm(int32_t microsteps) {
   float mm = microsteps * ((float)(PITCH)) / ((float)(MICROSTEPS * STEP_PER_REV));
   return mm;
 }
-float   v_microstepsTomm(int32_t microsteps) {
+float   vmicrostepsTomm(int32_t microsteps) {
   float mm = microsteps * ((float)(PITCH)) / ((float)(MICROSTEPS * STEP_PER_REV * (1 << 8)));
   return mm;
 }
-float   a_microstepsTomm(int32_t microsteps) {
+float   amicrostepsTomm(int32_t microsteps) {
   float mm = microsteps * ((float)(PITCH)) / ((float)(MICROSTEPS * STEP_PER_REV * (1 << 2)));
   return mm;
 }
