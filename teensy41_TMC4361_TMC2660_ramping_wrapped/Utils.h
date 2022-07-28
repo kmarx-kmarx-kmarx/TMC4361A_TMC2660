@@ -72,5 +72,6 @@ void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat);
 uint8_t readSwitchEvent(TMC4361ATypeDef *tmc4361A);
 void sRampInit(TMC4361ATypeDef *tmc4361A);
 void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param);
+void adjustBows(TMC4361ATypeDef *tmc4361A);
 
 #endif /* TMC_UTILS_H_ */

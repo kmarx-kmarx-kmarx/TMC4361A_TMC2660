@@ -20,7 +20,7 @@
        tmc4361A_stop:           Stop rotation. Unused.
        tmc4361A_moveTo:         Go to absolute position. Unused, instead use moveTo defined in Utils.
        tmc4361A_moveBy:         Move a relative amount. Unused, instead use move defined in Utils.
-       tmc4361A_discardVelocityDecimals: Properly format the velocity for writing to the TCM4361A.
+       REMOVED: tmc4361A_discardVelocityDecimals: Properly format the velocity for writing to the TCM4361A.
        tmc4361A_moveToNextFullstep: Move from the current microstep to the next full step. Unused.
        tmc4361A_calibrateClosedLoop: Calibrates closed loop using a linear encoder. Unused.
        
@@ -294,7 +294,7 @@ void tmc4361A_rotate(TMC4361ATypeDef *tmc4361A, int32_t velocity)
   // Disable Position Mode
   TMC4361A_FIELD_WRITE(tmc4361A, TMC4361A_RAMPMODE, TMC4361A_OPERATION_MODE_MASK, TMC4361A_OPERATION_MODE_SHIFT, 0);
 
-  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, tmc4361A_discardVelocityDecimals(velocity));
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, velocity);
 }
 
 void tmc4361A_right(TMC4361ATypeDef *tmc4361A, int32_t velocity)
@@ -317,7 +317,7 @@ void tmc4361A_moveTo(TMC4361ATypeDef *tmc4361A, int32_t position, uint32_t veloc
   // Enable Position Mode
   TMC4361A_FIELD_WRITE(tmc4361A, TMC4361A_RAMPMODE, TMC4361A_OPERATION_MODE_MASK, TMC4361A_OPERATION_MODE_SHIFT, 1);
 
-  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, tmc4361A_discardVelocityDecimals(velocityMax));
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, velocityMax);
 
   tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, position);
 }
@@ -331,14 +331,14 @@ void tmc4361A_moveBy(TMC4361ATypeDef *tmc4361A, int32_t *ticks, uint32_t velocit
   tmc4361A_moveTo(tmc4361A, *ticks, velocityMax);
 }
 
-int32_t tmc4361A_discardVelocityDecimals(int32_t value)
-{
-  if (abs(value) > 8000000)
-  {
-    value = (value < 0) ? -8000000 : 8000000;
-  }
-  return value << 8;
-}
+//int32_t tmc4361A_discardVelocityDecimals(int32_t value)
+//{
+//  if (abs(value) > 8000000)
+//  {
+//    value = (value < 0) ? -8000000 : 8000000;
+//  }
+//  return value << 8;
+//}
 
 static uint8_t tmc4361A_moveToNextFullstep(TMC4361ATypeDef *tmc4361A)
 {

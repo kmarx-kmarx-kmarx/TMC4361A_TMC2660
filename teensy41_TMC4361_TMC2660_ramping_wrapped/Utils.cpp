@@ -35,6 +35,7 @@
       readSwitchEvent:         Read events created by the limit switches
       sRampInit:               Write all parameters for the s-shaped ramp
       setSRampParam:           Set and write an individual parameter for the s-shaped ramp
+      adjustBows:              Sets shared bow values based on velocity and acceleration
 */
 #include "Utils.h"
 
@@ -477,7 +478,7 @@ void moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) {
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   tmc4361A_rotate(tmc4361A, vel);
   // Keep moving until we get a switch event
-  while (eventstate != RGHT_SW && eventstate != LEFT_SW) {
+  while (((eventstate != RGHT_SW) && (dir == RGHT_DIR)) || ((eventstate != LEFT_SW) && (dir == LEFT_DIR))) {
     delay(5);
     eventstate = readSwitchEvent(tmc4361A );
   }
@@ -569,6 +570,24 @@ void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
   return;
 }
 
+
+void adjustBows(TMC4361ATypeDef *tmc4361A) {
+  // Calculate what the jerks should be given amax and vmax
+  // Minimize the time a = amax under the constraint BOW1 = BOW2 = BOW3 = BOW4
+  // We also have to do unit conversions
+  float bowval = amicrostepsTomm(tmc4361A->rampParam[AMAX_IDX]) * amicrostepsTomm(tmc4361A->rampParam[AMAX_IDX]) / vmicrostepsTomm(tmc4361A->rampParam[VMAX_IDX]);
+  int32_t bow = xmmToMicrosteps(bowval);
+  bow = min((1 << 24) - 1, bow);
+
+  tmc4361A->rampParam[BOW1_IDX] = bow;
+  tmc4361A->rampParam[BOW2_IDX] = bow;
+  tmc4361A->rampParam[BOW3_IDX] = bow;
+  tmc4361A->rampParam[BOW4_IDX] = bow;
+
+  return;
+}
+
+
 /*
   -----------------------------------------------------------------------------
   DESCRIPTION: setMaxSpeed() writes a single ramp parameter to the TMC4361A.
@@ -594,10 +613,12 @@ void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
   -----------------------------------------------------------------------------
 */
 void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
-  velocity = tmc4361A_discardVelocityDecimals(velocity);
-  setSRampParam(tmc4361A, VMAX_IDX, velocity);
+  tmc4361A->rampParam[VMAX_IDX] = velocity;
+  adjustBows(tmc4361A);
+  sRampInit(tmc4361A);
   return;
 }
+
 
 /*
   -----------------------------------------------------------------------------
@@ -686,7 +707,7 @@ int32_t acceleration(TMC4361ATypeDef *tmc4361A) {
 
 /*
   -----------------------------------------------------------------------------
-  DESCRIPTION: setMaxAcceleration() writes a single ramp parameter to the TMC4361A.
+  DESCRIPTION: setMaxAcceleration() writes a acceleration and bow ramp parameters to the TMC4361A.
 
   OPERATION:   We first verify the new acceleration value is in bounds, then we change the variable in the shared struct. We also change bows 1 through 4 to ensure we hit max acceleration. Then we call sRampInit() to write the data.
 
@@ -713,19 +734,10 @@ int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
   if (acceleration > ((1 << 22) - 1)) {
     return ERR_OUT_OF_RANGE;
   }
-  // Calculate what the jerks should be given amax and vmax
-  // Minimize the time a = amax under the constraint BOW1 = BOW2 = BOW3 = BOW4
-  float bowval = (float)acceleration * (float)acceleration / (float)tmc4361A->rampParam[VMAX_IDX];
-  int32_t bow = bowval;
-  bow = min((1 << 24) - 1, bow);
-
-  tmc4361A->rampParam[BOW1_IDX] = bow;
-  tmc4361A->rampParam[BOW2_IDX] = bow;
-  tmc4361A->rampParam[BOW3_IDX] = bow;
-  tmc4361A->rampParam[BOW4_IDX] = bow;
+  
   tmc4361A->rampParam[AMAX_IDX] = acceleration;
   tmc4361A->rampParam[DMAX_IDX] = acceleration;
-
+  adjustBows(tmc4361A);
   sRampInit(tmc4361A);
 
   return NO_ERR;
@@ -892,9 +904,9 @@ void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
   int32_t current = currentPosition(tmc4361A);
   int32_t dif = position - current;
   // change motor parameters on the teensy
-  tmc4361A->xmax -= dif;
-  tmc4361A->xmin -= dif;
-  tmc4361A->xhome -= dif;
+  tmc4361A->xmax += dif;
+  tmc4361A->xmin += dif;
+  tmc4361A->xhome += dif;
   // change motor parameters on the driver
   tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, position);
   // Ensure the motor doesn't move

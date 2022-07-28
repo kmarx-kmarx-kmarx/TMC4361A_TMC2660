@@ -43,7 +43,7 @@ const uint32_t clk_Hz_TMC4361 = 16000000;
 const uint8_t lft_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t rht_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, LEFT_SW, LEFT_SW, LEFT_SW};
-const int32_t vslow =  50000;
+const int32_t vslow =  0x02FFFF00;
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -151,15 +151,10 @@ void setup() {
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
-    tmc4361[i].rampParam[BOW1_IDX] = 0x01FFFF;
-    tmc4361[i].rampParam[BOW2_IDX] = 0x1FFFFF;
-    tmc4361[i].rampParam[BOW3_IDX] = 0x1FFFFF;
-    tmc4361[i].rampParam[BOW4_IDX] = 0x01FFFF;
-    tmc4361[i].rampParam[AMAX_IDX] = 0x1FFFFF;
-    tmc4361[i].rampParam[DMAX_IDX] = 0x1FFFFF;
+    setMaxSpeed(&tmc4361[i], 0x04FFFF00);
+    setMaxAcceleration(&tmc4361[i], 0x1FFFFF);
     tmc4361[i].rampParam[ASTART_IDX] = 0;
     tmc4361[i].rampParam[DFINAL_IDX] = 0;
-    tmc4361[i].rampParam[VMAX_IDX] = 0x04FFFF00;
 
     sRampInit(&tmc4361[i]);
   }
@@ -304,6 +299,7 @@ void loop() {
       else {
         target = Serial.parseInt();
       }
+      Serial.println(target);
       setMaxAcceleration(&tmc4361[index], target);
       break;
 
@@ -316,6 +312,7 @@ void loop() {
       else {
         target = Serial.parseInt();
       }
+      Serial.println(target);
       setMaxSpeed(&tmc4361[index], target);
       break;
 
