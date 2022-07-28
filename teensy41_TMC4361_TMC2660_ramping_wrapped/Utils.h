@@ -32,8 +32,6 @@
 
 // Functions for user-facing API
 void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361);
-void homeLeft(TMC4361ATypeDef *tmc4361A, int32_t v_slow, int32_t v_fast); // todo: generalize
-void findRight(TMC4361ATypeDef *tmc4361A, int32_t v_slow);                // todo: generalize
 void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
 void setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
 int32_t speed(TMC4361ATypeDef *tmc4361A);

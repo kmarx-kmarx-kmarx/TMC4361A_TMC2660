@@ -1,9 +1,9 @@
 /*
     teensy41_TMC4361_TMC2660_ramping_wrapped.ino:
         This project implements positioning-based control on a Teensy 4.1 using the TMC4361A motor controller and TMC2660 motor driver.
-        These 2 ICs have a somewhat complicated API for setup and operation; this project provides a wrapper to make the API easier to use.
+        These two ICs have a somewhat complicated API for setup and operation; this project provides a wrapper to make the API easier to use.
         All functionality is implemented in the .h and .cpp files #included in this project; this file demonstrates their functionality with a human-usable serial interface.
-        This demonstration assumes the motor is set up with two limit switches.
+        This demonstration assumes the motor is set up with two limit switches in the default configuration.
         To use this demonstration, set the parameters as described below.
 
      DESCRIPTION: This file sets up and runs the main control loop.
@@ -13,7 +13,6 @@
     Shared Variables:
         ConfigurationTypeDef tmc4361_configs: Configurations for the motor controllers
         TMC4361ATypeDef tmc4361:              Motor structs contain motor state and parameters
-        uint8_t prevstate[N_MOTOR]:           Used for tracking motor position. Future versions of this code will use the TMC4361A EVENTS register instead of tracking state on the Teensy
 
     Motor Parameters:
         N_MOTOR: Number of TMC4361A motor controllers connected to the same SPI bus
@@ -48,8 +47,8 @@ const int32_t vslow =  0x007FFF00;
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
 TMC4361ATypeDef tmc4361[N_MOTOR];
-// Keep track of previous state to see if motor hit target
 
+// Initialization routines
 void setup() {
   // Initialize serial on the Teensy
   SerialUSB.begin(20000000);

@@ -4,38 +4,69 @@
    Some functions are low-level helpers and do not need to be accessed directly by the user
     User-facing functions:
       tmc4361A_tmc2660_init:   Initialize the tmc4361A and tmc2660
-      setMaxSpeed:             Write the target velocity to the tmc4361A in units microsteps per second
-      setSpeed:                Start moving at a constant speed in units microsteps per second (wraps rotate)
+          Arguments: TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361
+      setMaxSpeed:             Write the target velocity to the tmc4361A in units microsteps per second and recalculates bow values
+          Arguments: TMC4361ATypeDef *tmc4361A, int32_t velocity
+      setSpeed:                Start moving at a constant speed in units microsteps per second
+          Arguments: TMC4361ATypeDef *tmc4361A, int32_t velocity
       speed:                   Returns the current speed in microsteps per second
+          Arguments: TMC4361ATypeDef *tmc4361A
       acceleration:            Returns the current acceleration in microsteps per second^2
-      setMaxAcceleration:      Write the maximum acceleration in units microsteps per second squared
+          Arguments: TMC4361ATypeDef *tmc4361A
+      setMaxAcceleration:      Write the maximum acceleration in units microsteps per second squared and recalculates bow values
+          Arguments: TMC4361ATypeDef *tmc4361A, uint32_t acceleration
       moveTo:                  Move to the target absolute position in units microsteps
+          Arguments: TMC4361ATypeDef *tmc4361A, int32_t x_pos
       move:                    Move to a position relative to the current position in units microsteps
+          Arguments: TMC4361ATypeDef *tmc4361A, int32_t x_pos
       currentPosition:         Return the current position in units microsteps
+          Arguments: TMC4361ATypeDef *tmc4361A
       targetPosition:          Return the target position in units microsteps
+          Arguments: TMC4361ATypeDef *tmc4361A
       setCurrentPosition:      Set the current position to a specific value in units microsteps
+          Arguments: TMC4361ATypeDef *tmc4361A, int32_t position
       stop:                    Halt operation by setting the target position to the current position
+          Arguments: TMC4361ATypeDef *tmc4361A
       isRunning:               Returns true if the motor is moving
+          Arguments: TMC4361ATypeDef *tmc4361A
       xmmToMicrosteps:         Convert from millimeters to units microsteps for position and jerk values
+          Arguments: float mm
       xmicrostepsTomm:         Convert from microsteps to units millimeters for position and jerk values
+          Arguments: int32_t microsteps
       vmmToMicrosteps:         Convert from millimeters to units microsteps for velocity values
+          Arguments: float mm
       vmicrostepsTomm:         Convert from microsteps to units millimeters for velocity values
+          Arguments: int32_t microsteps
       ammToMicrosteps:         Convert from millimeters to units microsteps for acceleration values
+          Arguments: float mm
       amicrostepsTomm:         Convert from microsteps to units millimeters for acceleration values
+          Arguments: int32_t microsteps
       enableLimitSwitch:       Enables reading from limit switches and using limit switches as automatic stop indicators.
+          Arguments: TMC4361ATypeDef *tmc4361A, uint8_t pol_lft, uint8_t pol_rht
       enableHomingLimit:       Enables using the limit switch or homing
+          Arguments: TMC4361ATypeDef *tmc4361A, uint8_t sw, uint8_t pol_lft, uint8_t pol_rht
       readLimitSwitches:       Read limit switch current state
+          Arguments: TMC4361ATypeDef *tmc4361A
       moveToExtreme:           Go all the way left or right
+          Arguments: TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir
       setHome:                 Set current location as home
+          Arguments: TMC4361ATypeDef *tmc4361A
 
     For internal use:
       tmc4361A_readWriteArray: Used for low-level SPI communication with the TMC4361A
+          Arguments: uint8_t channel, uint8_t *data, size_t length
       tmc4361A_setBits:        Implements some of the features of tmc4361A_readWriteCover in an easier to use way; it sets bits in a register without disturbing the other bits
-      tmc4361A_setBits:        Implements some of the features of tmc4361A_readWriteCover in an easier to use way; it clears bits in a register without disturbing the other bits
+          Arguments: TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat
+      tmc4361A_rstBits:        Implements some of the features of tmc4361A_readWriteCover in an easier to use way; it clears bits in a register without disturbing the other bits
+          Arguments: TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat
       readSwitchEvent:         Read events created by the limit switches
+          Arguments: TMC4361ATypeDef *tmc4361A
       sRampInit:               Write all parameters for the s-shaped ramp
+          Arguments: TMC4361ATypeDef *tmc4361A
       setSRampParam:           Set and write an individual parameter for the s-shaped ramp
+          Arguments: TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param
       adjustBows:              Sets shared bow values based on velocity and acceleration
+          Arguments: TMC4361ATypeDef *tmc4361A
 */
 #include "Utils.h"
 
@@ -570,13 +601,36 @@ void setSRampParam(TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param) {
   return;
 }
 
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: adjustBows() computes bow values such that the least amount of time is spent saturated at AMAX
+  
+  OPERATION:   We read AMAX and VMAX, convert to mm, and compute AMAX^2/VMAX to get our target jerk. The jerk is them bound to be below our maximum value and writes it to the shared struct. All 4 bows are assigned the same value. The data is not written to the IC in this function.
+
+  ARGUMENTS:
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+
+  RETURNS: None
+
+  INPUTS / OUTPUTS: None
+  
+  LOCAL VARIABLES: None
+
+  SHARED VARIABLES:
+      TMC4361ATypeDef *tmc4361A: Values are read from and written to the struct
+
+  GLOBAL VARIABLES: None
+
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
 
 void adjustBows(TMC4361ATypeDef *tmc4361A) {
   // Calculate what the jerks should be given amax and vmax
   // Minimize the time a = amax under the constraint BOW1 = BOW2 = BOW3 = BOW4
   // We also have to do unit conversions
   float bowval = amicrostepsTomm(tmc4361A->rampParam[AMAX_IDX]) * amicrostepsTomm(tmc4361A->rampParam[AMAX_IDX]) / vmicrostepsTomm(tmc4361A->rampParam[VMAX_IDX]);
-  int32_t bow = xmmToMicrosteps(bowval);
+  int32_t bow = abs(xmmToMicrosteps(bowval));
   bow = min((1 << 24) - 1, bow);
 
   tmc4361A->rampParam[BOW1_IDX] = bow;
