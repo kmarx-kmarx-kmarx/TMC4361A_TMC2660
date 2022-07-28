@@ -645,7 +645,9 @@ void setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
   -----------------------------------------------------------------------------
 */
 void setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
-  tmc4361A_rotate(tmc4361A, velocity);
+  tmc4361A_readInt(tmc4361A,TMC4361A_EVENTS); // clear register
+  tmc4361A_rstBits(tmc4361A, TMC4361A_RAMPMODE, 0b111); // no velocity ramp
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, velocity);
   return;
 }
 
@@ -734,7 +736,7 @@ int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
   if (acceleration > ((1 << 22) - 1)) {
     return ERR_OUT_OF_RANGE;
   }
-  
+
   tmc4361A->rampParam[AMAX_IDX] = acceleration;
   tmc4361A->rampParam[DMAX_IDX] = acceleration;
   adjustBows(tmc4361A);
@@ -769,8 +771,8 @@ int8_t setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
   -----------------------------------------------------------------------------
 */
 int8_t moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos) {
-  // ensure we are in positioning mode
-  TMC4361A_FIELD_WRITE(tmc4361A, TMC4361A_RAMPMODE, TMC4361A_OPERATION_MODE_MASK, TMC4361A_OPERATION_MODE_SHIFT, 1);
+  // ensure we are in positioning mode with S-shaped ramp
+  sRampInit(tmc4361A);
 
   if (x_pos < tmc4361A->xmin || x_pos > tmc4361A->xmax) {
     return ERR_OUT_OF_RANGE;
@@ -909,8 +911,6 @@ void setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
   tmc4361A->xhome += dif;
   // change motor parameters on the driver
   tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, position);
-  // Ensure the motor doesn't move
-  moveTo(tmc4361A, position);
 
   return;
 }

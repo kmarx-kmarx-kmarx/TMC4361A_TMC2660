@@ -43,13 +43,12 @@ const uint32_t clk_Hz_TMC4361 = 16000000;
 const uint8_t lft_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t rht_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, LEFT_SW, LEFT_SW, LEFT_SW};
-const int32_t vslow =  0x02FFFF00;
+const int32_t vslow =  0x007FFF00;
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
 TMC4361ATypeDef tmc4361[N_MOTOR];
 // Keep track of previous state to see if motor hit target
-uint8_t prevstate[N_MOTOR] = {1}; //, 1, 1, 1};
 
 void setup() {
   // Initialize serial on the Teensy
@@ -98,8 +97,21 @@ void setup() {
   moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
   // Set left as home
   setHome(&tmc4361[0]);
+
+  for (int i = 0; i < N_MOTOR; i++) {
+    // initialize ramp with default values
+    setMaxSpeed(&tmc4361[i], 0x04FFFF00);
+    setMaxAcceleration(&tmc4361[i], 0x1FFFFF);
+    tmc4361[i].rampParam[ASTART_IDX] = 0;
+    tmc4361[i].rampParam[DFINAL_IDX] = 0;
+
+    sRampInit(&tmc4361[i]);
+  }
+
   // Set the home position to be 0
   setCurrentPosition(&tmc4361[0], 0);
+  // Go to 0
+  moveTo(&tmc4361[0], 0);
 
   // Print out motor stats
   for (int i = 0; i < N_MOTOR; i++) {
@@ -128,6 +140,10 @@ void setup() {
   Serial.println("r: Set the relative target position in units microsteps");
   Serial.println("R: Set the relative target position in units millimeters");
 
+  Serial.println("[u|U] <index> <setpoint>");
+  Serial.println("u: Set the target velocity in units microsteps/s");
+  Serial.println("U: Set the target velocity in units millimeters/s");
+
   Serial.println("w <index> [a|A|v|V] <value>");
   Serial.println("w: indicates start of write command");
   Serial.println("a: set maximum acceleration in pulses per second^2");
@@ -148,16 +164,6 @@ void setup() {
 
   Serial.print("Index selects which motor to read, in range 1 to ");
   Serial.println(N_MOTOR);
-
-  for (int i = 0; i < N_MOTOR; i++) {
-    // initialize ramp with default values
-    setMaxSpeed(&tmc4361[i], 0x04FFFF00);
-    setMaxAcceleration(&tmc4361[i], 0x1FFFFF);
-    tmc4361[i].rampParam[ASTART_IDX] = 0;
-    tmc4361[i].rampParam[DFINAL_IDX] = 0;
-
-    sRampInit(&tmc4361[i]);
-  }
 }
 
 void loop() {
@@ -231,6 +237,7 @@ void loop() {
         break;
       case 'S': // Movement
       case 's':
+        Serial.println("Abs Move");
         if (cmd == 'S') {
           tmp = Serial.parseFloat();
           target = xmmToMicrosteps(tmp);
@@ -242,6 +249,7 @@ void loop() {
         break;
       case 'R':
       case 'r':
+        Serial.println("Rel Move");
         if (cmd == 'R') {
           tmp = Serial.parseFloat();
           target = xmmToMicrosteps(tmp);
@@ -252,8 +260,23 @@ void loop() {
         move(&tmc4361[index], target);
         break;
 
+      case 'U':
+      case 'u':
+        Serial.print("Set Velocity: ");
+        if (cmd == 'U') {
+          tmp = Serial.parseFloat();
+          target = vmmToMicrosteps(tmp);
+        }
+        else {
+          target = Serial.parseInt();
+        }
+        Serial.println(target);
+        setSpeed(&tmc4361[index], target);
+        break;
+
       case 'x': // Current position
       case 'X':
+        Serial.print("Current pos: ");
         target = currentPosition(&tmc4361[index]);
 
         if (cmd == 'X') {
@@ -267,6 +290,7 @@ void loop() {
 
       case 't': // Target position
       case 'T':
+        Serial.print("Target pos: ");
         target = targetPosition(&tmc4361[index]);
 
         if (cmd == 'T') {
@@ -279,6 +303,7 @@ void loop() {
         break;
 
       case 'w':
+        Serial.println("Write parameter:");
         // If we have a write command, store the command for processing later
         Serial.read();       // Read and throw out the space
         cmd = Serial.read(); // Store the command
@@ -292,6 +317,7 @@ void loop() {
   switch (cmd) {
     case 'A': // set acceleration
     case 'a':
+      Serial.print("AMAX: ");
       if (cmd == 'A') {
         tmp = Serial.parseFloat();
         target = ammToMicrosteps(tmp);
@@ -306,6 +332,7 @@ void loop() {
     case 'V':
     case 'v':
       if (cmd == 'V') {
+        Serial.print("VMAX: ");
         tmp = Serial.parseFloat();
         target = vmmToMicrosteps(tmp);
       }
@@ -318,18 +345,5 @@ void loop() {
 
     default:
       break;
-  }
-
-  // Show results
-  for (int i = 0; i < N_MOTOR; i++) {
-    // todo: implement using events register instead of status register (ideally no need for prevstate[])
-    // rewrite this using the neat isRunning func
-    target  = isRunning(&tmc4361[i]);
-    if (target == 0 && prevstate[i] != 0) {
-      Serial.print("Motor with CS pin ");
-      Serial.print(tmc4361[i].config->channel);
-      Serial.println(" has reached its target");
-    }
-    prevstate[i] = target;
   }
 }
