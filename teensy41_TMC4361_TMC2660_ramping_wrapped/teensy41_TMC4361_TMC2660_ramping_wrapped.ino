@@ -32,7 +32,7 @@
 */
 
 #include "TMC4361A.h"
-#include "Utils.h"
+#include "TMC4361A_TMC2660_Utils.h"
 
 // Motor Parameters: connect 1 motor
 #define N_MOTOR 1
@@ -84,33 +84,34 @@ void setup() {
     // set up ICs with SPI control and other parameters
     tmc4361A_tmc2660_init(&tmc4361[i], clk_Hz_TMC4361);
     // enable limit switch reading
-    enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], rht_sw_pol[i]);
-    // enable homing using a limit switch
-    enableHomingLimit(&tmc4361[i], TMC4361_homing_sw[i], lft_sw_pol[i], rht_sw_pol[i]);
+    tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW);
+    tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW);
   }
 
   // Home all the motors depending on their requirements
+  tmc4361A_enableHomingLimit(&tmc4361[0], lft_sw_pol[0], TMC4361_homing_sw[0]);
   // First, move the first motor all the way right
-  moveToExtreme(&tmc4361[0], vslow, RGHT_DIR);
+  tmc4361A_moveToExtreme(&tmc4361[0], vslow, RGHT_DIR);
   // Then all the way left
-  moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
+  tmc4361A_moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
   // Set left as home
-  setHome(&tmc4361[0]);
+  tmc4361A_setHome(&tmc4361[0]);
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
-    setMaxSpeed(&tmc4361[i], 0x04FFFF00);
-    setMaxAcceleration(&tmc4361[i], 0x1FFFFF);
+    tmc4361A_setMaxSpeed(&tmc4361[i], 0x04FFFF00);
+    tmc4361A_setMaxAcceleration(&tmc4361[i], 0x1FFFFF);
     tmc4361[i].rampParam[ASTART_IDX] = 0;
     tmc4361[i].rampParam[DFINAL_IDX] = 0;
 
-    sRampInit(&tmc4361[i]);
+    tmc4361A_sRampInit(&tmc4361[i]);
   }
-
+  // Go to home position
+  tmc4361A_moveTo(&tmc4361[0], tmc4361[0].xhome);
   // Set the home position to be 0
-  setCurrentPosition(&tmc4361[0], 0);
+  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
   // Go to 0
-  moveTo(&tmc4361[0], 0);
+  tmc4361A_moveTo(&tmc4361[0], 0);
 
   // Print out motor stats
   for (int i = 0; i < N_MOTOR; i++) {
@@ -125,11 +126,11 @@ void setup() {
     Serial.print("Max value (microstep): ");
     Serial.println(tmc4361[i].xmax);
     Serial.print("Min value (millimeter): ");
-    Serial.println((float)tmc4361[i].xmin * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
+    Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmin));
     Serial.print("Home pos (millimeter):  ");
-    Serial.println((float)tmc4361[i].xhome * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
+    Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xhome));
     Serial.print("Max value (millimeter): ");
-    Serial.println((float)tmc4361[i].xmax * (float)PITCH / (MICROSTEPS * STEP_PER_REV));
+    Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmax));
   }
   // Print serial commands
   Serial.println("Syntax:");
@@ -191,72 +192,72 @@ void loop() {
         Serial.print("TMC4361A_BOW1 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW1_IDX]);
         Serial.print(", ");
-        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW1_IDX]));
+        Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[BOW1_IDX]));
 
         Serial.print("TMC4361A_BOW2 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW2_IDX]);
         Serial.print(", ");
-        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW2_IDX]));
+        Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[BOW2_IDX]));
 
         Serial.print("TMC4361A_BOW3 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW3_IDX]);
         Serial.print(", ");
-        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW3_IDX]));
+        Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[BOW3_IDX]));
 
         Serial.print("TMC4361A_BOW4 (microsteps/s^3, mm/s^3): ");
         Serial.print(tmc4361[index].rampParam[BOW4_IDX]);
         Serial.print(", ");
-        Serial.println(xmicrostepsTomm(tmc4361[index].rampParam[BOW4_IDX]));
+        Serial.println(tmc4361A_xmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[BOW4_IDX]));
 
         Serial.print("TMC4361A_AMAX (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[AMAX_IDX]);
         Serial.print(", ");
-        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[AMAX_IDX]));
+        Serial.println(tmc4361A_amicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[AMAX_IDX]));
 
         Serial.print("TMC4361A_DMAX (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[DMAX_IDX]);
         Serial.print(", ");
-        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[DMAX_IDX]));
+        Serial.println(tmc4361A_amicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[DMAX_IDX]));
 
 
         Serial.print("TMC4361A_ASTART (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[ASTART_IDX]);
         Serial.print(", ");
-        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[ASTART_IDX]));
+        Serial.println(tmc4361A_amicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[ASTART_IDX]));
 
         Serial.print("TMC4361A_DFINAL (microsteps/s^2, mm/s^2): ");
         Serial.print(tmc4361[index].rampParam[DFINAL_IDX]);
         Serial.print(", ");
-        Serial.println(amicrostepsTomm(tmc4361[index].rampParam[DFINAL_IDX]));
+        Serial.println(tmc4361A_amicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[DFINAL_IDX]));
 
         Serial.print("TMC4361A_VMAX (microsteps/s, mm/s): ");
         Serial.print(tmc4361[index].rampParam[VMAX_IDX]);
         Serial.print(", ");
-        Serial.println(vmicrostepsTomm(tmc4361[index].rampParam[VMAX_IDX]));
+        Serial.println(tmc4361A_vmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[VMAX_IDX]));
         break;
       case 'S': // Movement
       case 's':
         Serial.println("Abs Move");
         if (cmd == 'S') {
           tmp = Serial.parseFloat();
-          target = xmmToMicrosteps(tmp);
+          target = tmc4361A_xmmToMicrosteps(&tmc4361[index], tmp);
         }
         else {
           target = Serial.parseInt();
         }
-        moveTo(&tmc4361[index], target);
+        tmc4361A_moveTo(&tmc4361[index], target);
         break;
       case 'R':
       case 'r':
         Serial.println("Rel Move");
         if (cmd == 'R') {
           tmp = Serial.parseFloat();
-          target = xmmToMicrosteps(tmp);
+          target = tmc4361A_xmmToMicrosteps(&tmc4361[index], tmp);
         }
         else {
           target = Serial.parseInt();
         }
-        move(&tmc4361[index], target);
+        tmc4361A_move(&tmc4361[index], target);
         break;
 
       case 'U':
@@ -264,22 +265,22 @@ void loop() {
         Serial.print("Set Velocity: ");
         if (cmd == 'U') {
           tmp = Serial.parseFloat();
-          target = vmmToMicrosteps(tmp);
+          target = tmc4361A_vmmToMicrosteps(&tmc4361[index], tmp);
         }
         else {
           target = Serial.parseInt();
         }
         Serial.println(target);
-        setSpeed(&tmc4361[index], target);
+        tmc4361A_setSpeed(&tmc4361[index], target);
         break;
 
       case 'x': // Current position
       case 'X':
         Serial.print("Current pos: ");
-        target = currentPosition(&tmc4361[index]);
+        target = tmc4361A_currentPosition(&tmc4361[index]);
 
         if (cmd == 'X') {
-          tmp = xmicrostepsTomm(target);
+          tmp = tmc4361A_xmicrostepsTomm(&tmc4361[index], target);
           Serial.println(tmp);
         }
         else {
@@ -290,10 +291,10 @@ void loop() {
       case 't': // Target position
       case 'T':
         Serial.print("Target pos: ");
-        target = targetPosition(&tmc4361[index]);
+        target = tmc4361A_targetPosition(&tmc4361[index]);
 
         if (cmd == 'T') {
-          tmp = xmicrostepsTomm(target);
+          tmp = tmc4361A_xmicrostepsTomm(&tmc4361[index], target);
           Serial.println(tmp);
         }
         else {
@@ -319,13 +320,13 @@ void loop() {
       Serial.print("AMAX: ");
       if (cmd == 'A') {
         tmp = Serial.parseFloat();
-        target = ammToMicrosteps(tmp);
+        target = tmc4361A_ammToMicrosteps(&tmc4361[index], tmp);
       }
       else {
         target = Serial.parseInt();
       }
       Serial.println(target);
-      setMaxAcceleration(&tmc4361[index], target);
+      tmc4361A_setMaxAcceleration(&tmc4361[index], target);
       break;
 
     case 'V':
@@ -333,13 +334,13 @@ void loop() {
       if (cmd == 'V') {
         Serial.print("VMAX: ");
         tmp = Serial.parseFloat();
-        target = vmmToMicrosteps(tmp);
+        target = tmc4361A_vmmToMicrosteps(&tmc4361[index], tmp);
       }
       else {
         target = Serial.parseInt();
       }
       Serial.println(target);
-      setMaxSpeed(&tmc4361[index], target);
+      tmc4361A_setMaxSpeed(&tmc4361[index], target);
       break;
 
     default:

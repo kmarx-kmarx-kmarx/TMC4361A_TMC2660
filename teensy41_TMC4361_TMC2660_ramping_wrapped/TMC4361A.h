@@ -15,7 +15,7 @@
 #include "TMC4361A_Fields.h"
 
 // Constants for indexing ramp parameter array
-#define N_PARAM    9
+#define N_RPARAM   9
 #define BOW1_IDX   0
 #define BOW2_IDX   1
 #define BOW3_IDX   2
@@ -25,7 +25,13 @@
 #define ASTART_IDX 6
 #define DFINAL_IDX 7
 #define VMAX_IDX   8
-
+// Constants for indexing current scale value array
+#define N_CPARAM      5
+#define CSCALE_IDX    0
+#define HOLDSCALE_IDX 1
+#define DRV2SCALE_IDX 2
+#define DRV1SCALE_IDX 3
+#define BSTSCALE_IDX  4
 
 // Helper macros
 #define TMC4361A_FIELD_READ(tdef, address, mask, shift) \
@@ -46,7 +52,12 @@ typedef struct
   int32_t xmin;
   int32_t xmax;
   int32_t xhome;
-  int32_t rampParam[N_PARAM];
+  int32_t rampParam[N_RPARAM];
+  int32_t cscaleParam[N_CPARAM];
+  float   threadPitch;
+  uint16_t stepsPerRev;
+  uint16_t microsteps;
+  
   //TMotorConfig motorConfig;
   //TClosedLoopConfig closedLoopConfig;
   uint8_t status;

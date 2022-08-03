@@ -17,7 +17,7 @@
        tmc4361A_rotate:         Rotate at fixed velocity. Use this for velocity control.
        tmc4361A_right:          Rotate right at fixed velocity. Unused.
        tmc4361A_left:           Rotate left at fixed velocity. Unused.
-       tmc4361A_stop:           Stop rotation. Unused.
+       REMOVED: tmc4361A_stop:           Stop rotation. Unused, implemented in Utils
        tmc4361A_moveTo:         Go to absolute position. Unused, instead use moveTo defined in Utils.
        tmc4361A_moveBy:         Move a relative amount. Unused, instead use move defined in Utils.
        REMOVED: tmc4361A_discardVelocityDecimals: Properly format the velocity for writing to the TCM4361A.
@@ -161,7 +161,7 @@ void tmc4361A_init(TMC4361ATypeDef *tmc4361A, uint8_t channel, ConfigurationType
     tmc4361A->registerAccess[i]      = tmc4361A_defaultRegisterAccess[i];
     tmc4361A->registerResetState[i]  = registerResetState[i];
   }
-  for (i = 0; i < N_PARAM; i++) {
+  for (i = 0; i < N_RPARAM; i++) {
     tmc4361A->rampParam[i] = 0;
   }
 }
@@ -307,10 +307,10 @@ void tmc4361A_left(TMC4361ATypeDef *tmc4361A, int32_t velocity)
   tmc4361A_rotate(tmc4361A, -velocity);
 }
 
-void tmc4361A_stop(TMC4361ATypeDef *tmc4361A)
-{
-  tmc4361A_rotate(tmc4361A, 0);
-}
+//void tmc4361A_stop(TMC4361ATypeDef *tmc4361A)
+//{
+//  tmc4361A_rotate(tmc4361A, 0);
+//}
 
 void tmc4361A_moveTo(TMC4361ATypeDef *tmc4361A, int32_t position, uint32_t velocityMax)
 {
