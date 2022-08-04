@@ -35,14 +35,15 @@
 #include "TMC4361A_TMC2660_Utils.h"
 
 // Motor Parameters: connect 1 motor
-#define N_MOTOR 1
-const uint8_t pin_TMC4361_CS[N_MOTOR] = {41}; //, 36, 35, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
+#define N_MOTOR 2
+const uint8_t pin_TMC4361_CS[N_MOTOR] = {41,36}; //, 36, 35, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
 const uint8_t lft_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t rht_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
 const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, LEFT_SW, LEFT_SW, LEFT_SW};
-const int32_t vslow =  0x007FFF00;
+//const int32_t vslow =  0x007FFF00; 
+const int32_t vslow = 0x01FFFC00;
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -52,13 +53,14 @@ TMC4361ATypeDef tmc4361[N_MOTOR];
 void setup() {
   // Initialize serial on the Teensy
   SerialUSB.begin(20000000);
+  delay(1000);
   Serial.setTimeout(200);
-  // The Teensy operates at 3.3V while the TMC4361A and TMC2660 operate at 5V
-  // Supply 3.3V to the level shifters. Future board revisions will have power hardwired
-  pinMode(0, OUTPUT);
-  pinMode(1, OUTPUT);
-  digitalWrite(0, HIGH);
-  digitalWrite(1, HIGH);
+  //  // The Teensy operates at 3.3V while the TMC4361A and TMC2660 operate at 5V
+  //  // Supply 3.3V to the level shifters. Future board revisions will have power hardwired
+  //  pinMode(0, OUTPUT);
+  //  pinMode(1, OUTPUT);
+  //  digitalWrite(0, HIGH);
+  //  digitalWrite(1, HIGH);
 
   // Initialize clock
   pinMode(pin_TMC4361_CLK, OUTPUT);
@@ -73,6 +75,14 @@ void setup() {
     pinMode(pin_TMC4361_CS[i], OUTPUT);
     digitalWrite(pin_TMC4361_CS[i], HIGH);
   }
+
+  // Motor configurations
+  // 0.22 ohm -> 1 A; 0.15 ohm -> 1.47 A
+  tmc4361A_tmc2660_config(&tmc4361[0], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
+  if(N_MOTOR >= 2)
+    tmc4361A_tmc2660_config(&tmc4361[1], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
+  if(N_MOTOR == 3)
+    tmc4361A_tmc2660_config(&tmc4361[2], 0.34, 0.5, 1, 1, 1, 0.3, 200, 256);   // 500 mA
 
   // Initialize SPI - included in Utils.h
   SPI.begin();
