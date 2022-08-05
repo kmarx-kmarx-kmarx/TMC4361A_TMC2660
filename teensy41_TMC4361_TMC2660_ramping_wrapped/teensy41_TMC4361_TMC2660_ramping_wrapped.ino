@@ -55,12 +55,6 @@ void setup() {
   SerialUSB.begin(20000000);
   delay(1000);
   Serial.setTimeout(200);
-  //  // The Teensy operates at 3.3V while the TMC4361A and TMC2660 operate at 5V
-  //  // Supply 3.3V to the level shifters. Future board revisions will have power hardwired
-  //  pinMode(0, OUTPUT);
-  //  pinMode(1, OUTPUT);
-  //  digitalWrite(0, HIGH);
-  //  digitalWrite(1, HIGH);
 
   // Initialize clock
   pinMode(pin_TMC4361_CLK, OUTPUT);
@@ -94,8 +88,16 @@ void setup() {
     // set up ICs with SPI control and other parameters
     tmc4361A_tmc2660_init(&tmc4361[i], clk_Hz_TMC4361);
     // enable limit switch reading
-    tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW);
-    tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW);
+    if(pin_TMC4361_CS[i]==36)
+    {
+      tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, true);
+      tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, true);
+    }
+    else
+    {
+      tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, false);
+      tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, false);
+    }
   }
 
   // Home all the motors depending on their requirements

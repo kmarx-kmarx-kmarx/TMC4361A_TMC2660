@@ -381,20 +381,48 @@ void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, 0x000A0000);
   tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, 0x000C000A);
   tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, 0x000E00A0); // SDOFF = 1 -> SPI mode
-
-  // Initialize with default current scaling parameters
-  for (int i = 0; i < N_CPARAM; i++) {
-    tmc4361A->cscaleParam[i] = TMC2660_TMC4361A_defaultCscaleval[i];
-  }
+  // current scaling
   tmc4361A_cScaleInit(tmc4361A);
-
   tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current scale
   tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
+  // microstepping setting
+  tmc4361A_setMicrosteps(tmc4361A, tmc4361A->microsteps);
+  return;
+}
 
-  tmc4361A_setPitch(tmc4361A, DEFAULT_PITCH);
-  tmc4361A_setSPR(tmc4361A, DEFAULT_STEP_PER_REV);
-  tmc4361A_setMicrosteps(tmc4361A, DEFAULT_MICROSTEPS);
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_tmc2660_config() configures the parameters for tmc4361A and tmc2660
+  OPERATION:   set parameters
+  ARGUMENTS:
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      float tmc2660_cscale: 0-1
+      float tmc4361a_hold_scale_val: 0-1
+      float tmc4361a_drv2_scale_val: 0-1
+      float tmc4361a_drv1_scale_val: 0-1
+      float tmc4361a_boost_scale_val: maximum current during the boost phase (in certain sections of the velocity ramp it can be useful to boost the current), 0-1
+      float pitch_mm: mm traveled per full motor revolution
+      uint16_t steps_per_rev: full steps per rev
+      uint16_t microsteps: number of microsteps per fullstep. must be a power of 2 from 1 to 256.
+  RETURNS: None
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+  LOCAL VARIABLES: None
+  SHARED VARIABLES:
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct
+  GLOBAL VARIABLES: None
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
+void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, float tmc4361a_hold_scale_val, float tmc4361a_drv2_scale_val, float tmc4361a_drv1_scale_val, float tmc4361a_boost_scale_val, float pitch_mm, uint16_t steps_per_rev, uint16_t microsteps) {
 
+  tmc4361A->cscaleParam[0] = uint8_t(tmc2660_cscale*31);
+  tmc4361A->cscaleParam[1] = uint8_t(tmc4361a_hold_scale_val*255);
+  tmc4361A->cscaleParam[2] = uint8_t(tmc4361a_drv2_scale_val*255);
+  tmc4361A->cscaleParam[3] = uint8_t(tmc4361a_drv1_scale_val*255);
+  tmc4361A->cscaleParam[4] = uint8_t(tmc4361a_boost_scale_val*255);
+  tmc4361A_setPitch(tmc4361A, pitch_mm);
+  tmc4361A_setSPR(tmc4361A, steps_per_rev);
+  tmc4361A->microsteps = microsteps;
   return;
 }
 
