@@ -39,10 +39,9 @@
 const uint8_t pin_TMC4361_CS[N_MOTOR] = {41,36}; //, 36, 35, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
-const uint8_t lft_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
-const uint8_t rht_sw_pol[N_MOTOR] = {1}; // , 1,1,1};
-const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW}; //, LEFT_SW, LEFT_SW, LEFT_SW};
-//const int32_t vslow =  0x007FFF00; 
+const uint8_t lft_sw_pol[N_MOTOR] = {1,1}; // , 1,1,1};
+const uint8_t rht_sw_pol[N_MOTOR] = {1,1}; // , 1,1,1};
+const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW, LEFT_SW}; //, LEFT_SW, LEFT_SW, LEFT_SW};
 const int32_t vslow = 0x01FFFC00;
 
 // Cofigs and motor structs
@@ -54,7 +53,6 @@ void setup() {
   // Initialize serial on the Teensy
   SerialUSB.begin(20000000);
   delay(1000);
-  Serial.setTimeout(200);
 
   // Initialize clock
   pinMode(pin_TMC4361_CLK, OUTPUT);
@@ -82,13 +80,14 @@ void setup() {
   SPI.begin();
   // Give some time to finish initialization before using the SPI bus
   delayMicroseconds(5000);
-
+  
   // initilize TMC4361 and TMC2660 - turn on functionality
   for (int i = 0; i < N_MOTOR; i++) {
     // set up ICs with SPI control and other parameters
     tmc4361A_tmc2660_init(&tmc4361[i], clk_Hz_TMC4361);
+    Serial.println(tmc4361A_readInt(&tmc4361[i], TMC4361A_STATUS), BIN);
     // enable limit switch reading
-    if(pin_TMC4361_CS[i]==36)
+    if(i==1)
     {
       tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, true);
       tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, true);
@@ -99,15 +98,18 @@ void setup() {
       tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, false);
     }
   }
-
+  Serial.println(tmc4361A_readInt(&tmc4361[0], TMC4361A_STATUS), BIN);
   // Home all the motors depending on their requirements
   tmc4361A_enableHomingLimit(&tmc4361[0], lft_sw_pol[0], TMC4361_homing_sw[0]);
+  Serial.println(tmc4361A_readInt(&tmc4361[0], TMC4361A_STATUS), BIN);
   // First, move the first motor all the way right
   tmc4361A_moveToExtreme(&tmc4361[0], vslow, RGHT_DIR);
   // Then all the way left
   tmc4361A_moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
+  Serial.println(tmc4361A_readInt(&tmc4361[0], TMC4361A_STATUS), BIN);
   // Set left as home
   tmc4361A_setHome(&tmc4361[0]);
+  Serial.println(tmc4361A_readInt(&tmc4361[0], TMC4361A_STATUS), BIN);
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values

@@ -164,6 +164,9 @@ void tmc4361A_init(TMC4361ATypeDef *tmc4361A, uint8_t channel, ConfigurationType
   for (i = 0; i < N_RPARAM; i++) {
     tmc4361A->rampParam[i] = 0;
   }
+  for (i = 0; i < N_CPARAM; i++) {
+    tmc4361A->cscaleParam[i] = 0;
+  }
 }
 
 // Fill the shadow registers of hardware preset non-readable registers
