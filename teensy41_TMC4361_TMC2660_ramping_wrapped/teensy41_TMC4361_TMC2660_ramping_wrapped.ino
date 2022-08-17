@@ -50,6 +50,8 @@ TMC4361ATypeDef tmc4361[N_MOTOR];
 
 // Initialization routines
 void setup() {
+  pinMode(33, OUTPUT);
+  digitalWrite(33, HIGH);
   // Initialize serial on the Teensy
   SerialUSB.begin(20000000);
   delay(1000);
@@ -70,11 +72,13 @@ void setup() {
 
   // Motor configurations
   // 0.22 ohm -> 1 A; 0.15 ohm -> 1.47 A
-  tmc4361A_tmc2660_config(&tmc4361[0], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
-  if (N_MOTOR >= 2)
-    tmc4361A_tmc2660_config(&tmc4361[1], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
-  if (N_MOTOR == 3)
-    tmc4361A_tmc2660_config(&tmc4361[2], 0.34, 0.5, 1, 1, 1, 0.3, 200, 256);   // 500 mA
+  tmc4361A_tmc2660_config(&tmc4361[0], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256); 
+  tmc4361A_tmc2660_config(&tmc4361[1], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256); 
+  tmc4361A_tmc2660_config(&tmc4361[2], 1, 0.25, 0.31, 0.31, 0.31, 0.3, 200, 256); 
+//  tmc4361A_tmc2660_config(&tmc4361[0], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
+//  tmc4361A_tmc2660_config(&tmc4361[1], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
+//  tmc4361A_tmc2660_config(&tmc4361[2], 0.34, 0.5, 1, 1, 1, 0.3, 200, 256);   // 500 mA
+
 
   // Initialize SPI - included in Utils.h
   SPI.begin();
@@ -91,7 +95,7 @@ void setup() {
       tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, true);
       tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, true);
     }
-    else
+    else if (i == 0)
     {
       tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, false);
       tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, false);
@@ -157,21 +161,21 @@ void setup() {
     SerialUSB.println(tmc4361A_vmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[VMAX_IDX]));
   }
 
-//  // Home all the motors depending on their requirements
-//  tmc4361A_enableHomingLimit(&tmc4361[0], lft_sw_pol[0], TMC4361_homing_sw[0]);
-//  // First, move the first motor all the way right
-//  tmc4361A_moveToExtreme(&tmc4361[0], vslow, RGHT_DIR);
-//  // Then all the way left
-//  tmc4361A_moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
-//  // Set left as home
-//  tmc4361A_setHome(&tmc4361[0]);
-//  // Go to home position
-//  tmc4361A_setMaxSpeed(&tmc4361[0], 0x04FFFF00);
-//  tmc4361A_moveTo(&tmc4361[0], tmc4361[0].xhome);
-//  // Set the home position to be 0
-//  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
-//  // Go to 0
-//  tmc4361A_moveTo(&tmc4361[0], 0);
+  //  // Home all the motors depending on their requirements
+  //  tmc4361A_enableHomingLimit(&tmc4361[0], lft_sw_pol[0], TMC4361_homing_sw[0]);
+  //  // First, move the first motor all the way right
+  //  tmc4361A_moveToExtreme(&tmc4361[0], vslow, RGHT_DIR);
+  //  // Then all the way left
+  //  tmc4361A_moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
+  //  // Set left as home
+  //  tmc4361A_setHome(&tmc4361[0]);
+  //  // Go to home position
+  //  tmc4361A_setMaxSpeed(&tmc4361[0], 0x04FFFF00);
+  //  tmc4361A_moveTo(&tmc4361[0], tmc4361[0].xhome);
+  //  // Set the home position to be 0
+  //  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
+  //  // Go to 0
+  //  tmc4361A_moveTo(&tmc4361[0], 0);
 
   // Print out motor stats
   for (int i = 0; i < N_MOTOR; i++) {
