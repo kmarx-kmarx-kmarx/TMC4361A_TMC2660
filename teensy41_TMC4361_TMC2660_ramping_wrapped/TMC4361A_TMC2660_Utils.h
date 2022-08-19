@@ -4,6 +4,8 @@
 
     Created on: 7/8/2022
         Author: Kevin Marx
+    
+    With additions and modifications from Hongquan Li 8/3/2022
 */
 #ifndef TMC_UTILS_H_
 #define TMC_UTILS_H_
@@ -26,7 +28,7 @@ int8_t tmc4361A_moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos);
 int8_t tmc4361A_move(TMC4361ATypeDef *tmc4361A, int32_t x_pos);
 int32_t tmc4361A_currentPosition(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_targetPosition(TMC4361ATypeDef *tmc4361A);
-void tmc4361A_setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position);
+int8_t tmc4361A_setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position);
 void tmc4361A_stop(TMC4361ATypeDef *tmc4361A);
 bool tmc4361A_isRunning(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_xmmToMicrosteps(TMC4361ATypeDef *tmc4361A, float mm);
@@ -42,9 +44,10 @@ void tmc4361A_setHome(TMC4361ATypeDef *tmc4361A);
 void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir);
 void tmc4361A_cScaleInit(TMC4361ATypeDef *tmc4361A);
 void tmc4361A_setPitch(TMC4361ATypeDef *tmc4361A, float pitchval);
-void tmc4361A_setMicrosteps(TMC4361ATypeDef *tmc4361A, uint16_t mstep);
-int8_t tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A);
-void tmc4361A_setSPR(TMC4361ATypeDef *tmc4361A, uint16_t spr);
+int8_t tmc4361A_setMicrosteps(TMC4361ATypeDef *tmc4361A, uint16_t mstep);
+void tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A);
+int8_t tmc4361A_setSPR(TMC4361ATypeDef *tmc4361A, uint16_t spr);
+void tmc4361A_writeSPR(TMC4361ATypeDef *tmc4361A);
 
 
 // The following does not need to be accessed by the end user
@@ -74,8 +77,8 @@ static const uint8_t TMC2660_TMC4361A_defaultCscaleval[N_CPARAM] = {TMC2660_CSCA
 #define RGHT_SW 0b10
 #define LEFT_DIR -1
 #define RGHT_DIR  1
-#define BOWMAX 0x1FFFFFF   // (1<<24 - 1) 
-#define ACCELMAX ((1 << 22) - 1)
+#define BOWMAX ((1<<24) - 1) 
+#define ACCELMAX ((1 << 24) - 1)
 
 void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length);
 void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat);

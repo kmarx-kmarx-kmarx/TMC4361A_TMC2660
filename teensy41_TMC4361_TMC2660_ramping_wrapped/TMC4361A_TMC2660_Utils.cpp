@@ -57,10 +57,12 @@
           Arguments: TMC4361ATypeDef *tmc4361A, float pitchval
       tmc4361A_setMicrosteps:           Set the number of microsteps per fullstep, must be a power of 2 between 1 and 256 inclusive
           Arguments: TMC4361ATypeDef *tmc4361A, uint16_t mstep
+      tmc4361A_setSPR:                  Set the motor's steps per revolution, typically 200
+          Arguments: TMC4361ATypeDef *tmc4361A, uint16_t spr
       tmc4361A_writeMicrosteps:         Write the number of microsteps per fullstep to the motor driver
           Arguments: TMC4361ATypeDef *tmc4361A
-s      tmc4361A_setSPR:                  Set the motor's steps per revolution, typically 200
-          Arguments: TMC4361ATypeDef *tmc4361A, uint16_t spr
+      tmc4361A_setSPR:                  Write the number of steps per revolution to the motor driver
+          Arguments: TMC4361ATypeDef *tmc4361A
 
     For internal use:
       tmc4361A_readWriteArray: Used for low-level SPI communication with the TMC4361A
@@ -72,6 +74,8 @@ s      tmc4361A_setSPR:                  Set the motor's steps per revolution, t
       tmc4361A_readSwitchEvent:         Read events created by the limit switches
           Arguments: TMC4361ATypeDef *tmc4361A
       tmc4361A_sRampInit:               Write all parameters for the s-shaped ramp
+          Arguments: TMC4361ATypeDef *tmc4361A
+      tmc4361A_cScaleInit:              Write all parameters for current scaling
           Arguments: TMC4361ATypeDef *tmc4361A
       tmc4361A_setSRampParam:           Set and write an individual parameter for the s-shaped ramp
           Arguments: TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param
@@ -227,7 +231,9 @@ void tmc4361A_cScaleInit(TMC4361ATypeDef *tmc4361A) {
                     (tmc4361A->cscaleParam[DRV2SCALE_IDX] << TMC4361A_DRV2_SCALE_VAL_SHIFT) +   // Set DRV2 scale  (0 to 255)
                     (tmc4361A->cscaleParam[DRV1SCALE_IDX] << TMC4361A_DRV1_SCALE_VAL_SHIFT) +   // Set DRV1 scale  (0 to 255)
                     (tmc4361A->cscaleParam[BSTSCALE_IDX]  << TMC4361A_BOOST_SCALE_VAL_SHIFT));  // Set boost scale (0 to 255)
-
+  tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current scale
+  tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
+  
   return;
 }
 
@@ -262,17 +268,17 @@ void tmc4361A_setPitch(TMC4361ATypeDef *tmc4361A, float pitchval) {
 
 /*
   -----------------------------------------------------------------------------
-  DESCRIPTION: tmc4361A_writeMicrosteps() writes the number of microsteps per fullstep to the motor controller
-  
+  DESCRIPTION: tmc4361A_writeMicrosteps() writes the number of microsteps per fullstep to the motor controller.
+
   OPERATION:   We first check if the mstep argument is a power of 2. We set an error flag if it is not.
                We then convert the microsteps number to the correct format for the tmc4361A: 256 -> 0, 128 -> 1, ..., 1 -> 8.
                This conversion is performed by shifting mstep down a bit and incrementing bitsSet until mstep is equal to 0. This is equivalent to evaluating log_2(mstep)+1. Then we calculate 9-bitsSet to convert to the proper format.
 
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint16_t mstep:            Number of microsteps in one full step
 
-  RETURNS:
-      int8_t err: Returns NO_ERR if successful or ERR_OUT_OF_RANGE if the microsteps value is invalid
+  RETURNS: none
 
   INPUTS / OUTPUTS: Sends signals ove MOSI/MISO; the motor should not move
 
@@ -289,7 +295,7 @@ void tmc4361A_setPitch(TMC4361ATypeDef *tmc4361A, float pitchval) {
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-int8_t tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A) {
+void tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A) {
   int8_t err = NO_ERR; // Initally assume mstep is valid
   uint8_t  bitsSet = 0;
   uint16_t mstep = tmc4361A->microsteps;
@@ -313,18 +319,19 @@ int8_t tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A) {
   if (err == NO_ERR) {
     tmc4361A_setBits(tmc4361A, TMC4361A_STEP_CONF, bitsSet);
   }
-  return err;
+
+  return;
 }
 
 /*
   -----------------------------------------------------------------------------
-  DESCRIPTION: tmc4361A_setMicrosteps() sets microsteps per fullstep parameter.
-  
+  DESCRIPTION: tmc4361A_setMicrosteps() sets microsteps per fullstep for the motor.
+
   OPERATION:   We write the value in the argument to the motor driver struct
 
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
-      uint16_t mstep:            Microsteps per fullstep
+      uint16_t mstep:            microsteps per fullstep
 
   RETURNS: None
 
@@ -340,9 +347,15 @@ int8_t tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A) {
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_setMicrosteps(TMC4361ATypeDef *tmc4361A, uint16_t mstep) {
-  tmc4361A->microsteps = mstep;
-  return;
+int8_t tmc4361A_setMicrosteps(TMC4361ATypeDef *tmc4361A, uint16_t mstep) {
+  // Ensure mstep is a power of 2 and within bounds
+  if ((mstep != 0) && !(mstep & (mstep - 1)) && (mstep <= 256)) {
+    tmc4361A->microsteps = mstep;
+    return NO_ERR;
+  }
+  else {
+    return ERR_OUT_OF_RANGE;
+  }
 }
 
 /*
@@ -369,8 +382,42 @@ void tmc4361A_setMicrosteps(TMC4361ATypeDef *tmc4361A, uint16_t mstep) {
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_setSPR(TMC4361ATypeDef *tmc4361A, uint16_t spr) {
-  tmc4361A->stepsPerRev = spr;
+int8_t tmc4361A_setSPR(TMC4361ATypeDef *tmc4361A, uint16_t spr) {
+  if (spr > ((1 << 12) - 1)) { // spr is a 12 bit number
+    return ERR_OUT_OF_RANGE;
+  }
+  else {
+    tmc4361A->stepsPerRev = spr;
+    return NO_ERR;
+  }
+}
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_writeSPR() writes steps-per-revolution for the motor to the motor driver.
+
+  OPERATION:   We read the value in the motor driver struct, format it, and send it to the motor driver
+
+  ARGUMENTS:
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+
+  RETURNS: None
+
+  INPUTS / OUTPUTS: None
+
+  LOCAL VARIABLES: None
+
+  SHARED VARIABLES:
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct
+
+  GLOBAL VARIABLES: None
+
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
+void tmc4361A_writeSPR(TMC4361ATypeDef *tmc4361A) {
+  tmc4361A_rstBits(tmc4361A, TMC4361A_STEP_CONF, TMC4361A_FS_PER_REV_MASK);
+  tmc4361A_setBits(tmc4361A, TMC4361A_STEP_CONF, tmc4361A->stepsPerRev << TMC4361A_FS_PER_REV_SHIFT);
   return;
 }
 
@@ -404,7 +451,7 @@ void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   // clk
   tmc4361A_writeInt(tmc4361A, TMC4361A_CLK_FREQ, clk_Hz_TMC4361);
   // SPI configuration
-  tmc4361A_writeInt(tmc4361A, TMC4361A_SPIOUT_CONF, 0x4440108A);  
+  tmc4361A_writeInt(tmc4361A, TMC4361A_SPIOUT_CONF, 0x4440108A);
   // cover datagram for TMC2660
   tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, 0x000900C3);
   tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, 0x000A0000);
@@ -412,10 +459,9 @@ void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, 0x000E00A0); // SDOFF = 1 -> SPI mode
   // current scaling
   tmc4361A_cScaleInit(tmc4361A);
-  tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current scale
-  tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
   // microstepping setting
   tmc4361A_writeMicrosteps(tmc4361A);
+  tmc4361A_writeSPR(tmc4361A);
   return;
 }
 
@@ -449,6 +495,7 @@ void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
   // microstepping setting
   tmc4361A_writeMicrosteps(tmc4361A);
+  tmc4361A_writeSPR(tmc4361A);
   return;
 }
 
@@ -477,11 +524,11 @@ void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A) {
 */
 void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, float tmc4361a_hold_scale_val, float tmc4361a_drv2_scale_val, float tmc4361a_drv1_scale_val, float tmc4361a_boost_scale_val, float pitch_mm, uint16_t steps_per_rev, uint16_t microsteps) {
 
-  tmc4361A->cscaleParam[0] = uint8_t(tmc2660_cscale*31);
-  tmc4361A->cscaleParam[1] = uint8_t(tmc4361a_hold_scale_val*255);
-  tmc4361A->cscaleParam[2] = uint8_t(tmc4361a_drv2_scale_val*255);
-  tmc4361A->cscaleParam[3] = uint8_t(tmc4361a_drv1_scale_val*255);
-  tmc4361A->cscaleParam[4] = uint8_t(tmc4361a_boost_scale_val*255);
+  tmc4361A->cscaleParam[0] = uint8_t(tmc2660_cscale * 31);
+  tmc4361A->cscaleParam[1] = uint8_t(tmc4361a_hold_scale_val * 255);
+  tmc4361A->cscaleParam[2] = uint8_t(tmc4361a_drv2_scale_val * 255);
+  tmc4361A->cscaleParam[3] = uint8_t(tmc4361a_drv1_scale_val * 255);
+  tmc4361A->cscaleParam[4] = uint8_t(tmc4361a_boost_scale_val * 255);
   tmc4361A_setPitch(tmc4361A, pitch_mm);
   tmc4361A_setSPR(tmc4361A, steps_per_rev);
   tmc4361A_setMicrosteps(tmc4361A, microsteps);
@@ -520,7 +567,7 @@ void tmc4361A_enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
   uint32_t pol_datagram;
   uint32_t en_datagram;
   // Handle case where the switches are flipped
-  if(flipped != 0){
+  if (flipped != 0) {
     tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, TMC4361A_INVERT_STOP_DIRECTION_MASK);
   }
   // Determine what to do based on which switch to enable
@@ -531,7 +578,7 @@ void tmc4361A_enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
       en_datagram = TMC4361A_STOP_LEFT_EN_MASK;
       tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, pol_datagram);
       tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, en_datagram);
-       // store position when we hit left bound
+      // store position when we hit left bound
       tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, TMC4361A_LATCH_X_ON_ACTIVE_L_MASK);
       break;
     case RGHT_SW:
@@ -541,7 +588,7 @@ void tmc4361A_enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
       tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, pol_datagram);
       tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, en_datagram);
       // store position when we hit right bound
-      tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, TMC4361A_LATCH_X_ON_ACTIVE_R_MASK); 
+      tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, TMC4361A_LATCH_X_ON_ACTIVE_R_MASK);
       break;
   }
   return;
@@ -572,7 +619,7 @@ void tmc4361A_enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uint8_t which){
+void tmc4361A_enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uint8_t which) {
   if (which == LEFT_SW) {
     if (polarity != 0) {
       // If the left switch is active high, HOME_REF = 0 indicates positive direction in reference to X_HOME
@@ -997,7 +1044,7 @@ void tmc4361A_setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-int32_t speed(TMC4361ATypeDef *tmc4361A) {
+int32_t tmc4361A_speed(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_VACTUAL);
 }
 
@@ -1055,8 +1102,10 @@ int32_t tmc4361A_acceleration(TMC4361ATypeDef *tmc4361A) {
   -----------------------------------------------------------------------------
 */
 int8_t tmc4361A_setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration) {
+  int8_t err = NO_ERR;
   if (acceleration > ACCELMAX) {
-    return ERR_OUT_OF_RANGE;
+    err = ERR_OUT_OF_RANGE;
+    acceleration = ACCELMAX;
   }
 
   tmc4361A->rampParam[AMAX_IDX] = acceleration;
@@ -1064,7 +1113,7 @@ int8_t tmc4361A_setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t accelerat
   tmc4361A_adjustBows(tmc4361A);
   tmc4361A_sRampInit(tmc4361A);
 
-  return NO_ERR;
+  return err;
 }
 
 /*
@@ -1208,7 +1257,8 @@ int32_t tmc4361A_targetPosition(TMC4361ATypeDef *tmc4361A) {
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
 
-  RETURNS: None
+  RETURNS: 
+      int8_t err: NO_ERR if the new xmin, xmax, and xhome don't hit the min/max int32_t values and ERR_OUT_OF_RANGE if they do
 
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
 
@@ -1224,17 +1274,73 @@ int32_t tmc4361A_targetPosition(TMC4361ATypeDef *tmc4361A) {
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
+int8_t tmc4361A_setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) {
   int32_t current = tmc4361A_currentPosition(tmc4361A);
   int32_t dif = position - current;
+  int8_t err = NO_ERR;
   // change motor parameters on the teensy
-  tmc4361A->xmax += dif;
-  tmc4361A->xmin += dif;
-  tmc4361A->xhome += dif;
+  // first, ensure no overflows happen
+  int32_t xmax  = tmc4361A->xmax;
+  int32_t xmin  = tmc4361A->xmin;
+  int32_t xhome = tmc4361A->xhome;
+  if(dif > 0){
+    // perform addition overflow check
+    if(xmax > INT32_MAX-dif){
+      err = ERR_OUT_OF_RANGE;
+      xmax = INT32_MAX;
+    }
+    else{
+      xmax += dif;
+    }
+    if(xmin > INT32_MAX-dif){
+      err = ERR_OUT_OF_RANGE;
+      xmin = INT32_MAX;
+    }
+    else{
+      xmin += dif;
+    }
+    if(xhome > INT32_MAX-dif){
+      err = ERR_OUT_OF_RANGE;
+      xhome = INT32_MAX;
+    }
+    else{
+      xhome += dif;
+    }
+  }
+  else{
+    // perform subtraction overflow check
+    if(xmax < INT32_MIN-dif){
+      err = ERR_OUT_OF_RANGE;
+      xmax = INT32_MIN;
+    }
+    else{
+      xmax += dif;
+    }
+    if(xmin < INT32_MIN-dif){
+      err = ERR_OUT_OF_RANGE;
+      xmin = INT32_MIN;
+    }
+    else{
+      xmin += dif;
+    }
+    if(xhome < INT32_MIN-dif){
+      err = ERR_OUT_OF_RANGE;
+      xmin = INT32_MIN;
+    }
+    else{
+      xhome += dif;
+    }
+  }
+  // save the new values
+  tmc4361A->xmax = xmax;
+  tmc4361A->xmin = xmin;
+  tmc4361A->xhome = xhome;
   // change motor parameters on the driver
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, 0);
   tmc4361A_writeInt(tmc4361A, TMC4361A_XACTUAL, position);
+  tmc4361A_moveTo(tmc4361A, position);
 
-  return;
+  return err;
 }
 
 /*
