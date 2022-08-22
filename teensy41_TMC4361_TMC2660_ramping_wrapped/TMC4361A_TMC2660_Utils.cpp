@@ -800,7 +800,7 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
   if (dir == RGHT_DIR && eventstate == RGHT_SW) {
     tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
     // rotate puts us in velocity mode
-    tmc4361A_rotate(tmc4361A, vel * LEFT_DIR);
+    tmc4361A_setSpeed(tmc4361A, vel * LEFT_DIR);
     while (eventstate == RGHT_SW) {
       eventstate = tmc4361A_readLimitSwitches(tmc4361A);
       delay(5);
@@ -810,7 +810,7 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
   // If we are moving left and already are at the left switch, back up
   else if (dir == LEFT_DIR && eventstate == LEFT_SW) {
     tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
-    tmc4361A_rotate(tmc4361A, vel * RGHT_DIR);
+    tmc4361A_setSpeed(tmc4361A, vel * RGHT_DIR);
     while (eventstate == LEFT_SW) {
       eventstate = tmc4361A_readLimitSwitches(tmc4361A);
       delay(5);
@@ -822,7 +822,7 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
   vel *= dir;
   // Read the events register before moving
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
-  tmc4361A_rotate(tmc4361A, vel);
+  tmc4361A_setSpeed(tmc4361A, vel);
   // Keep moving until we get a switch event
   while (((eventstate != RGHT_SW) && (dir == RGHT_DIR)) || ((eventstate != LEFT_SW) && (dir == LEFT_DIR))) {
     delay(5);
@@ -866,6 +866,7 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
 */
 void tmc4361A_sRampInit(TMC4361ATypeDef *tmc4361A) {
   tmc4361A_setBits(tmc4361A, TMC4361A_RAMPMODE, 0b110); // positioning mode, s-shaped ramp
+  tmc4361A_rstBits(tmc4361A, TMC4361A_GENERAL_CONF, TMC4361A_USE_ASTART_AND_VSTART_MASK); // keep astart, vstart = 0
   tmc4361A_writeInt(tmc4361A, TMC4361A_BOW1, tmc4361A->rampParam[BOW1_IDX]); // determines the value which increases the absolute acceleration value.
   tmc4361A_writeInt(tmc4361A, TMC4361A_BOW2, tmc4361A->rampParam[BOW2_IDX]); // determines the value which decreases the absolute acceleration value.
   tmc4361A_writeInt(tmc4361A, TMC4361A_BOW3, tmc4361A->rampParam[BOW3_IDX]); // determines the value which increases the absolute deceleration value.
@@ -1015,7 +1016,7 @@ void tmc4361A_setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
 */
 void tmc4361A_setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity) {
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS); // clear register
-  tmc4361A_rstBits(tmc4361A, TMC4361A_RAMPMODE, 0b111); // no velocity ramp
+  tmc4361A_rstBits(tmc4361A, TMC4361A_RAMPMODE, 0b100); // no velocity ramp
   tmc4361A_writeInt(tmc4361A, TMC4361A_VMAX, velocity);
   return;
 }
