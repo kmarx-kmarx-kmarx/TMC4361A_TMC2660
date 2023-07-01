@@ -22,6 +22,9 @@ void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A);
 void tmc4361A_setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
 void tmc4361A_setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
 void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean);
+void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t err_tolerance,uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv);
+void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode);
+int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_reading, int32_t *internal_reading, uint8_t n_measurements, int32_t start_pos, int32_t end_pos, uint16_t timeout_ms);
 bool tmc4361A_read_deviation_flag(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_read_encoder_filtered(TMC4361ATypeDef *tmc4361A);
@@ -77,6 +80,7 @@ static const uint8_t TMC2660_TMC4361A_defaultCscaleval[N_CPARAM] = {TMC2660_CSCA
 #define NO_ERR            0
 #define ERR_OUT_OF_RANGE -1
 #define ERR_MISC         -2
+#define ERR_TIMEOUT      -3
 
 #define LEFT_SW 0b01
 #define RGHT_SW 0b10
@@ -85,8 +89,14 @@ static const uint8_t TMC2660_TMC4361A_defaultCscaleval[N_CPARAM] = {TMC2660_CSCA
 #define BOWMAX ((1<<24) - 1) 
 #define ACCELMAX ((1 << 24) - 1)
 
+// Encoder IIR params
 #define FILTER_WAITTIME_MIN 32
 #define FILTER_UPDATETIME_MIN 256
+
+// PID params
+#define PID_DISABLE 0b00 // Disable PID
+#define PID_BPG0    0b10 // Base Pulse Generator is 0
+#define PID_BPGV    0b11 // Base Pulse Generator is VACUTAL
 
 void tmc4361A_readWriteArray(uint8_t channel, uint8_t *data, size_t length);
 void tmc4361A_setBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat);
