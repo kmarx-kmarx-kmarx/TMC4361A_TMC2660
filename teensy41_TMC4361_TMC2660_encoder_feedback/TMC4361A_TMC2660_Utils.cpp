@@ -1712,6 +1712,8 @@ void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t err_tolerance, uint32
                records the encoder reading and internal microstep reading. The rest of the open-loop
                setup must be done before running this function (e.g. set home and init_ABN_encoder).
 
+               This also can be run with the PID loop active to compare the different results.
+
   OPERATION:   We first use the start_pos, end_pos, and n_measurements to find the step size. 
                Next, we set start_pos as our setpoint and wait until we reach there. 
                Then, we record the encoder and microstep readings into the shared array.
@@ -1731,8 +1733,12 @@ void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t err_tolerance, uint32
   RETURNS: None
 
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
+                    The motor also will move.
 
-  LOCAL VARIABLES: uint32_t datagram
+  LOCAL VARIABLES: int32_t step_size: the amount to move to get to the next step
+                   uint32_t t0:       tracks time since the movement began for use for timeout
+                   int32_t target:    the desitnation to move the motor to
+                   int8_t:            error from movement problems (timeout or hitting a limit switch)
 
   SHARED VARIABLES:
       TMC4361ATypeDef *tmc4361A: Values are read from the struct
@@ -1744,7 +1750,7 @@ void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t err_tolerance, uint32
 */
 int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_reading, int32_t *internal_reading, uint8_t n_measurements, int32_t start_pos, int32_t end_pos, uint16_t timeout_ms){
   int32_t step_size = (end_pos - start_pos)/(n_measurements - 1);
-  int32_t t0;
+  uint32_t t0;
   int32_t target;
   int8_t err;
   

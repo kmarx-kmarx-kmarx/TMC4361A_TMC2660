@@ -1,6 +1,7 @@
 /*
-    teensy41_TMC4361_TMC2660_ramping_wrapped.ino:
-        This project implements positioning-based control on a Teensy 4.1 using the TMC4361A motor controller and TMC2660 motor driver.
+    teensy41_TMC4361_TMC2660_encoder_feedback.ino:
+        z motor only
+        This project implements PID-controlled positioning-based control on a Teensy 4.1 using the TMC4361A motor controller and TMC2660 motor driver.
         These two ICs have a somewhat complicated API for setup and operation; this project provides a wrapper to make the API easier to use.
         All functionality is implemented in the .h and .cpp files #included in this project; this file demonstrates their functionality with a human-usable serial interface.
         This demonstration assumes the motor is set up with two limit switches in the default configuration.
@@ -33,16 +34,19 @@
 
 #include "TMC4361A.h"
 #include "TMC4361A_TMC2660_Utils.h"
+#include "octopi.h"
 
 // Motor Parameters: connect 1 motor
-#define N_MOTOR 3
-const uint8_t pin_TMC4361_CS[N_MOTOR] = {41, 36, 35};//, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
+#define N_MOTOR 1
+const uint8_t pin_TMC4361_CS[N_MOTOR] = {35};//, 36, 35};//, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
-const uint8_t lft_sw_pol[] = {1, 1, 1};//,1,1};
-const uint8_t rht_sw_pol[] = {1, 1, 1};//,1,1};
-const uint8_t TMC4361_homing_sw[] = {LEFT_SW, LEFT_SW, LEFT_SW}; //, LEFT_SW, LEFT_SW};
+const uint8_t lft_sw_pol[N_MOTOR] = {1};//, 1, 1};//,1,1};
+const uint8_t rht_sw_pol[N_MOTOR] = {1};//, 1, 1};//,1,1};
+const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW};//, LEFT_SW, LEFT_SW}; //, LEFT_SW, LEFT_SW};
 const int32_t vslow = 0x01FFFC00;
+
+#define N_TESTPOINTS 50
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -72,12 +76,13 @@ void setup() {
 
   // Motor configurations
   // 0.22 ohm -> 1 A; 0.15 ohm -> 1.47 A
-  tmc4361A_tmc2660_config(&tmc4361[0], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256); 
-  tmc4361A_tmc2660_config(&tmc4361[1], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256); 
-  tmc4361A_tmc2660_config(&tmc4361[2], 1, 0.25, 0.31, 0.31, 0.31, 0.3, 200, 256); 
-//  tmc4361A_tmc2660_config(&tmc4361[0], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
-//  tmc4361A_tmc2660_config(&tmc4361[1], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
-//  tmc4361A_tmc2660_config(&tmc4361[2], 0.34, 0.5, 1, 1, 1, 0.3, 200, 256);   // 500 mA
+  // tmc4361A_tmc2660_config(&tmc4361[0], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256);
+  // tmc4361A_tmc2660_config(&tmc4361[1], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256);
+  // tmc4361A_tmc2660_config(&tmc4361[2], 1, 0.25, 0.31, 0.31, 0.31, 0.3, 200, 256);
+  //  tmc4361A_tmc2660_config(&tmc4361[0], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
+  //  tmc4361A_tmc2660_config(&tmc4361[1], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
+  //  tmc4361A_tmc2660_config(&tmc4361[2], 0.34, 0.5, 1, 1, 1, 0.3, 200, 256);   // 500 mA
+  tmc4361A_tmc2660_config(&tmc4361[0], (Z_MOTOR_RMS_CURRENT_mA / 1000)*R_sense_z / 0.2298, Z_MOTOR_I_HOLD, 1, 1, 1, SCREW_PITCH_Z_MM, FULLSTEPS_PER_REV_Z, MICROSTEPPING_Z); // need to make current scaling on TMC2660 is > 16 (out of 31)
 
 
   // Initialize SPI - included in Utils.h
@@ -90,23 +95,15 @@ void setup() {
     // set up ICs with SPI control and other parameters
     tmc4361A_tmc2660_init(&tmc4361[i], clk_Hz_TMC4361);
     // enable limit switch reading
-    if (i == 1)
-    {
-      tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, true);
-      tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, true);
-    }
-    else if (i == 0)
-    {
-      tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, false);
-      tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, false);
-    }
+    tmc4361A_enableLimitSwitch(&tmc4361[0], rht_sw_pol[0], RGHT_SW, false);
+    tmc4361A_enableLimitSwitch(&tmc4361[0], lft_sw_pol[0], LEFT_SW, false);
   }
 
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
-    tmc4361A_setMaxSpeed(&tmc4361[i], 0x04FFFF00);
-    tmc4361A_setMaxAcceleration(&tmc4361[i], 0x1FFFFF);
+    tmc4361A_setMaxSpeed(&tmc4361[i], tmc4361A_vmmToMicrosteps(&tmc4361[z], MAX_VELOCITY_Z_mm));
+    tmc4361A_setMaxAcceleration(&tmc4361[i], tmc4361A_ammToMicrosteps(&tmc4361[z], MAX_ACCELERATION_Z_mm));
     tmc4361[i].rampParam[ASTART_IDX] = 0;
     tmc4361[i].rampParam[DFINAL_IDX] = 0;
 
@@ -161,22 +158,26 @@ void setup() {
     SerialUSB.println(tmc4361A_vmicrostepsTomm(&tmc4361[index], tmc4361[index].rampParam[VMAX_IDX]));
   }
 
-  //  // Home all the motors depending on their requirements
-  //  tmc4361A_enableHomingLimit(&tmc4361[0], lft_sw_pol[0], TMC4361_homing_sw[0]);
-  //  // First, move the first motor all the way right
-  //  tmc4361A_moveToExtreme(&tmc4361[0], vslow, RGHT_DIR);
-  //  // Then all the way left
-  //  tmc4361A_moveToExtreme(&tmc4361[0], vslow, LEFT_DIR);
-  //  // Set left as home
-  //  tmc4361A_setHome(&tmc4361[0]);
-  //  // Go to home position
-  //  tmc4361A_setMaxSpeed(&tmc4361[0], 0x04FFFF00);
-  //  tmc4361A_moveTo(&tmc4361[0], tmc4361[0].xhome);
-  //  // Set the home position to be 0
-  //  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
-  //  // Go to 0
-  //  tmc4361A_moveTo(&tmc4361[0], 0);
+  tmc4361A_enableHomingLimit(&tmc4361[0], rht_sw_pol[0], TMC4361_homing_sw[0]);
+  // Perform homing
+  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[z], MAX_VELOCITY_Z_mm) / 2, RGHT_DIR);
+  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[z], MAX_VELOCITY_Z_mm) / 2, LEFT_DIR);
+  tmc4361A_setHome(&tmc4361[y]);
 
+  // Initialze the encoder
+  //                                    A/B transitions per rev and filter params
+  tmc4361A_init_ABN_encoder(&tmc4361[0], 400000, 32, 11, 128);
+  // Perform linearity test
+  int32_t msteps[N_TESTPOINTS];
+  int32_t encoder_readings[N_TESTPOINTS];
+  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, tmc4361[0].xmin + 20, tmc4361[0].xmax - 20, 500);
+  Serial.println(err);
+  Serial.println("Internal reading and encoder reading");
+  for (int i = 0; i < N_TESTPOINTS; i++) {
+    Serial.print(msteps[i]);
+    Serial.print(", ");
+    Serial.println(encoder_readings[i]);
+  }
   // Print out motor stats
   for (int i = 0; i < N_MOTOR; i++) {
     SerialUSB.print("Motor ");
