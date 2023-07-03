@@ -1510,6 +1510,7 @@ float   tmc4361A_amicrostepsTomm(TMC4361ATypeDef *tmc4361A, int32_t microsteps) 
       uint8_t filter_wait_time:  Delay between consecutive clock cycles for reading the encoder velocity. Minimum of FILTER_WAITTIME_MIN
       uint8_t filter_exponent:   Decay exponent for the IIR filter. Lower value means faster response; 0 disables filtering
       uint16_t filter_vmean:     Frequency at which V_mean is updated in the register. Minimum of FILTER_UPDATETIME_MIN.
+      bool invert:               If set to true, invert the direction of the encoder
 
   RETURNS: None
 
@@ -1526,14 +1527,20 @@ float   tmc4361A_amicrostepsTomm(TMC4361ATypeDef *tmc4361A, int32_t microsteps) 
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean){
+void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean, bool invert){
   uint32_t datagram;
 
   datagram = enc_res & TMC4361A_ENC_IN_RES_MASK; // ensure manual mode bit isn't set
   tmc4361A_writeInt(tmc4361A, TMC4361A_ENC_IN_RES_WR, datagram);
 
+  // set the velocity filter
   datagram = uint32_t(filter_wait_time) + ((uint32_t(filter_exponent) << TMC4361A_ENC_VMEAN_FILTER_SHIFT)&TMC4361A_ENC_VMEAN_FILTER_MASK) + ((uint32_t(filter_vmean) << TMC4361A_ENC_VMEAN_INT_SHIFT)&TMC4361A_ENC_VMEAN_INT_MASK);
   tmc4361A_writeInt(tmc4361A, TMC4361A_ENC_VMEAN_FILTER_WR, datagram);
+
+  // set whether or not to invert
+  if(invert){
+    tmc4361A_setBits(tmc4361A, TMC4361A_ENC_IN_CONF, TMC4361A_INVERT_ENC_DIR_MASK);
+  }
 
   return;
 }
@@ -1545,6 +1552,7 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
 
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      uint8_t n_avg_exp:         Average 2^n_avg_exp values. It takes slightly longer than 1ms for each avg
 
   RETURNS: Encoder position in units "microsteps"
 
@@ -1560,10 +1568,19 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A){
+int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A, uint8_t n_avg_exp){
+  int32_t reading = 0;
+  for(uint8_t j = 0; j < (1<<n_avg_exp); j++){
+      reading += tmc4361A_readInt(tmc4361A, TMC4361A_ENC_POS) >> n_avg_exp;
+      delay(1);
+    }
+  return reading;
+
+}
+int32_t tmc4361A_read_encoder_vel(TMC4361ATypeDef *tmc4361A){
   return tmc4361A_readInt(tmc4361A, TMC4361A_V_ENC_RD);
 }
-int32_t tmc4361A_read_encoder_filtered(TMC4361ATypeDef *tmc4361A){
+int32_t tmc4361A_read_encoder_vel_filtered(TMC4361ATypeDef *tmc4361A){
   return tmc4361A_readInt(tmc4361A, TMC4361A_V_ENC_MEAN_RD);
 }
 /*
@@ -1594,6 +1611,7 @@ int32_t tmc4361A_read_deviation(TMC4361ATypeDef *tmc4361A){
 }
 /*
   -----------------------------------------------------------------------------
+  This function doesn't work. It appeas the problem is that the deviation error tolerance isn't being written properly so the flag never gets raised.
   DESCRIPTION: tmc4361A_read_deviation_flag() returns True if the difference between XACTUAL and ENC_POS exceeds 
 
   OPERATION:   We read the relevant registers.
@@ -1663,7 +1681,8 @@ void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode){
 
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
-      uint32_t err_tolerance:    If the difference between XACTUAL and ENC_POS is less than this, stop the PID and report TARGET_REACHED
+      uint32_t target_tolerance: If the difference between XACTUAL and ENC_POS is less than this, raise the TARGET_REACHED flag
+      uint32_t pid_tolerance:    If the difference between XACTUAL and ENC_POS is less than this, stop the PID and hold the current position
       uint32_t pid_p:            24-bit proportional term. (PID_P/256) * error * 1/seconds
       uint32_t pid_i:            24-bit integral term. (PID_I/256) * (PID_ISUM / 256) * 1/seconds
       uint32_t pid_d:            24-bit differential term. (PID_D) * error * d/dt
@@ -1686,11 +1705,12 @@ void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode){
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t err_tolerance, uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv){
+void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uint32_t pid_tolerance, uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv){
   uint32_t datagram;
 
-  tmc4361A_writeInt(tmc4361A, TMC4361A_ENC_POS_DEV_RD, err_tolerance);   // Set the TARGET_REACHED tolerance
-  tmc4361A_writeInt(tmc4361A, TMC4361A_PID_TOLERANCE_WR, err_tolerance); // Set the PID tolerance
+  tmc4361A_writeInt(tmc4361A, TMC4361A_CL_TR_TOLERANCE_WR, target_tolerance);   // Set the TARGET_REACHED tolerance
+  tmc4361A_writeInt(tmc4361A, TMC4361A_PID_TOLERANCE_WR, pid_tolerance); // Set the PID tolerance
+
 
   // Write the PID parameters
   tmc4361A_writeInt(tmc4361A, TMC4361A_PID_P_WR, pid_p & TMC4361A_PID_P_MASK);
@@ -1767,14 +1787,15 @@ int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_re
     while((tmc4361A_currentPosition(tmc4361A) != target) && ((millis() - t0) < timeout_ms)){
       delay(1);
     }
+    // Get the positions
+    delay(50);
+    encoder_reading[i] = tmc4361A_read_encoder(tmc4361A, N_ENC_AVG_EXP);
+    internal_reading[i] = tmc4361A_currentPosition(tmc4361A);
     // If we didn't, break
     if(tmc4361A_currentPosition(tmc4361A) != target){
       err = ERR_TIMEOUT;
       break;
     }
-    // Get the positions
-    encoder_reading[i] = tmc4361A_read_encoder(tmc4361A);
-    internal_reading[i] = tmc4361A_currentPosition(tmc4361A);
     // Make sure we didn't hit a limit switch
     if(tmc4361A_readLimitSwitches(tmc4361A) != 0){
       err = ERR_OUT_OF_RANGE;
@@ -1783,4 +1804,138 @@ int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_re
   }
 
   return err;
+}
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_moveTo_no_stick() writes the new setpoint to the TMC4361A and monitors the movement in case the carriage gets stuck.
+               This is a blocking function. It only works if the motor stage has an encoder set up.
+
+  OPERATION:   First, go to positioning mode. Then first verify the new position value is in bounds, then we clear the event register, send the data to the TMC4613, clear the event register again, and read the current position to refresh it.
+               We next monitor the deviation while the carriage is moving. If the deviation exceeds the threshold, go back to the position where it got stuck and then some to un-stick the carriage.
+               then continue moving to the target position.
+               If we do not get to the target position before the timeout time, return an error
+
+
+  ARGUMENTS:
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int32_t x_pos:             The target position in microsteps
+      int32_t backup_amount:     Distance to back up if the carriage is stuck in microsteps
+      uint32_t err_thresh:       Deviation error threshold for recognizing the carriage is stuck. This should be a relatively large value because the deviation gets large when moving normally.
+      uint16_t timeout_ms:       If timeout_ms elapses and we do not hit our target, raise an error.
+
+  RETURNS:
+      uint8_t err: Return ERR_OUT_OF_RANGE, ERR_TIMEOUT, or NO_ERR depending on what happened.
+
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively. The motor also will move.
+
+  LOCAL VARIABLES: None
+
+  SHARED VARIABLES:
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct
+
+  GLOBAL VARIABLES: None
+
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
+int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_t backup_amount, uint32_t err_thresh, uint16_t timeout_ms)  {
+  uint32_t t0 = 0;
+  int32_t original_position, backup_target;
+  int8_t err = NO_ERR;
+
+  // ensure we are in positioning mode with S-shaped ramp
+  tmc4361A_sRampInit(tmc4361A);
+
+  if (x_pos < tmc4361A->xmin || x_pos > tmc4361A->xmax) {
+    return ERR_OUT_OF_RANGE;
+  }
+  // Check which direction we are going - used to determine whether to subtract or add the backup amount
+  original_position = tmc4361A_currentPosition(tmc4361A);
+  if(x_pos - original_position > 0){
+    // If the target is more positive than the current position, the backup direction is negative
+    backup_amount = backup_amount * -1;
+  }
+  // Get the current time
+  t0 = millis();
+  // Read events before and after to clear the register
+  tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
+  tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
+  // Start keeping track of time, deviation, and position:
+  while(true){
+    // Break and return error if we time out
+    if(millis() - t0 > timeout_ms){
+      err = ERR_TIMEOUT;
+      break;
+    }
+    // Break and return no error if we hit the target successfully
+    if ((tmc4361A_readInt(tmc4361A, TMC4361A_STATUS) & TMC4361A_TARGET_REACHED_MASK) != 0) {
+      err = NO_ERR;
+      break;
+    }
+    // If we have too much deviation, back up and try again
+    if(abs(tmc4361A_read_deviation(tmc4361A)) > err_thresh){
+      tmc4361A_stop(tmc4361A);
+      // disable PID
+      tmc4361A_set_PID(tmc4361A, PID_DISABLE);
+      // Find out where to back up to
+      original_position = tmc4361A_currentPosition(tmc4361A);
+      backup_target = backup_amount + original_position;
+
+      tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, backup_target);
+      
+      // Wait until we back up or time out
+      while((millis()-t0 < timeout_ms) && ((tmc4361A_readInt(tmc4361A, TMC4361A_STATUS) & TMC4361A_TARGET_REACHED_MASK) == 0)){
+        delay(50);
+      }
+
+      // re-enable PID
+      tmc4361A_set_PID(tmc4361A, PID_BPG0);
+      // Go back to the original target
+      tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
+      delay(50); // Give extra time to start moving
+    }
+    // idle
+    delay(50);
+  }
+  tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
+  // Read X_ACTUAL to get it to refresh
+  tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);
+
+  return NO_ERR;
+}
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_moveTo_no_stick() sets the new setpoint relative to the current setpoint.
+
+  OPERATION:   We first convert the relative position to an absolute position and call moveTo_no_stick()
+
+
+  ARGUMENTS:
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int32_t x_pos:             The target position in microsteps
+      int32_t backup_amount:     Distance to back up if the carriage is stuck in microsteps
+      uint32_t err_thresh:       Deviation error threshold for recognizing the carriage is stuck. This should be a relatively large value because the deviation gets large when moving normally.
+      uint16_t timeout_ms:       If timeout_ms elapses and we do not hit our target, raise an error.
+
+  RETURNS:
+      uint8_t err: Return ERR_OUT_OF_RANGE, ERR_TIMEOUT, or NO_ERR depending on what happened.
+
+  INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively. The motor also will move.
+
+  LOCAL VARIABLES: None
+
+  SHARED VARIABLES:
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct
+
+  GLOBAL VARIABLES: None
+
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
+int8_t tmc4361A_move_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_t backup_amount, uint32_t err_thresh, uint16_t timeout_ms) {
+  int32_t current = tmc4361A_currentPosition(tmc4361A);
+  int32_t target = current + x_pos;
+
+  return tmc4361A_moveTo_no_stick(tmc4361A, target, backup_amount, err_thresh, timeout_ms);
 }

@@ -46,8 +46,8 @@ static const long X_NEG_LIMIT_MM = -130;
 static const long X_POS_LIMIT_MM = 130;
 static const long Y_NEG_LIMIT_MM = -130;
 static const long Y_POS_LIMIT_MM = 130;
-static const long Z_NEG_LIMIT_MM = -20;
-static const long Z_POS_LIMIT_MM = 20;
+static const long Z_NEG_LIMIT_MM = -3;
+static const long Z_POS_LIMIT_MM = 3;
 
 // size 11 lead screw motors
 float X_MOTOR_RMS_CURRENT_mA = 1000;

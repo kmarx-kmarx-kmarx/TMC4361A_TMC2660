@@ -21,19 +21,22 @@ void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361);
 void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A);
 void tmc4361A_setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
 void tmc4361A_setSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
-void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean);
-void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t err_tolerance,uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv);
+void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean, bool invert);
+void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uint32_t pid_tolerance, uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv);
 void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode);
 int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_reading, int32_t *internal_reading, uint8_t n_measurements, int32_t start_pos, int32_t end_pos, uint16_t timeout_ms);
 bool tmc4361A_read_deviation_flag(TMC4361ATypeDef *tmc4361A);
-int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A);
-int32_t tmc4361A_read_encoder_filtered(TMC4361ATypeDef *tmc4361A);
+int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A, uint8_t n_avg_exp);
+int32_t tmc4361A_read_encoder_vel(TMC4361ATypeDef *tmc4361A);
+int32_t tmc4361A_read_encoder_vel_filtered(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_read_deviation(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_speed(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_acceleration(TMC4361ATypeDef *tmc4361A);
 int8_t tmc4361A_setMaxAcceleration(TMC4361ATypeDef *tmc4361A, uint32_t acceleration);
 int8_t tmc4361A_moveTo(TMC4361ATypeDef *tmc4361A, int32_t x_pos);
+int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_t backup_amount, uint32_t err_thresh, uint16_t timeout_ms);
 int8_t tmc4361A_move(TMC4361ATypeDef *tmc4361A, int32_t x_pos);
+int8_t tmc4361A_move_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_t backup_amount, uint32_t err_thresh, uint16_t timeout_ms);
 int32_t tmc4361A_currentPosition(TMC4361ATypeDef *tmc4361A);
 int32_t tmc4361A_targetPosition(TMC4361ATypeDef *tmc4361A);
 int8_t tmc4361A_setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position);
@@ -92,6 +95,8 @@ static const uint8_t TMC2660_TMC4361A_defaultCscaleval[N_CPARAM] = {TMC2660_CSCA
 // Encoder IIR params
 #define FILTER_WAITTIME_MIN 32
 #define FILTER_UPDATETIME_MIN 256
+
+#define N_ENC_AVG_EXP 5 // avg (1<<N_ENC_AVG_EXP) values for encoder read
 
 // PID params
 #define PID_DISABLE 0b00 // Disable PID

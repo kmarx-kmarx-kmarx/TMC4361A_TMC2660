@@ -41,12 +41,14 @@
 const uint8_t pin_TMC4361_CS[N_MOTOR] = {35};//, 36, 35};//, 34}; // leaving other pins here so it's easy to switch over to controlling all 4 motors
 const uint8_t pin_TMC4361_CLK = 37;
 const uint32_t clk_Hz_TMC4361 = 16000000;
-const uint8_t lft_sw_pol[N_MOTOR] = {1};//, 1, 1};//,1,1};
-const uint8_t rht_sw_pol[N_MOTOR] = {1};//, 1, 1};//,1,1};
+const uint8_t lft_sw_pol[N_MOTOR] = {0};//, 1, 1};//,1,1};
+const uint8_t rht_sw_pol[N_MOTOR] = {0};//, 1, 1};//,1,1};
 const uint8_t TMC4361_homing_sw[N_MOTOR] = {LEFT_SW};//, LEFT_SW, LEFT_SW}; //, LEFT_SW, LEFT_SW};
 const int32_t vslow = 0x01FFFC00;
 
-#define N_TESTPOINTS 50
+#define ENCODER_ERROR_TOLERANCE 300000
+
+#define N_TESTPOINTS 4 // for linearity test
 
 // Cofigs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -76,12 +78,6 @@ void setup() {
 
   // Motor configurations
   // 0.22 ohm -> 1 A; 0.15 ohm -> 1.47 A
-  // tmc4361A_tmc2660_config(&tmc4361[0], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256);
-  // tmc4361A_tmc2660_config(&tmc4361[1], 1, 0.25, 0.31, 0.31, 0.31, 2.54, 200, 256);
-  // tmc4361A_tmc2660_config(&tmc4361[2], 1, 0.25, 0.31, 0.31, 0.31, 0.3, 200, 256);
-  //  tmc4361A_tmc2660_config(&tmc4361[0], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
-  //  tmc4361A_tmc2660_config(&tmc4361[1], 0.68, 0.5, 1, 1, 1, 2.54, 200, 256);  // 1A RMS
-  //  tmc4361A_tmc2660_config(&tmc4361[2], 0.34, 0.5, 1, 1, 1, 0.3, 200, 256);   // 500 mA
   tmc4361A_tmc2660_config(&tmc4361[0], (Z_MOTOR_RMS_CURRENT_mA / 1000)*R_sense_z / 0.2298, Z_MOTOR_I_HOLD, 1, 1, 1, SCREW_PITCH_Z_MM, FULLSTEPS_PER_REV_Z, MICROSTEPPING_Z); // need to make current scaling on TMC2660 is > 16 (out of 31)
 
 
@@ -95,15 +91,15 @@ void setup() {
     // set up ICs with SPI control and other parameters
     tmc4361A_tmc2660_init(&tmc4361[i], clk_Hz_TMC4361);
     // enable limit switch reading
-    tmc4361A_enableLimitSwitch(&tmc4361[0], rht_sw_pol[0], RGHT_SW, false);
-    tmc4361A_enableLimitSwitch(&tmc4361[0], lft_sw_pol[0], LEFT_SW, false);
+    tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, false);
+    tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, false);
   }
 
 
   for (int i = 0; i < N_MOTOR; i++) {
     // initialize ramp with default values
-    tmc4361A_setMaxSpeed(&tmc4361[i], tmc4361A_vmmToMicrosteps(&tmc4361[z], MAX_VELOCITY_Z_mm));
-    tmc4361A_setMaxAcceleration(&tmc4361[i], tmc4361A_ammToMicrosteps(&tmc4361[z], MAX_ACCELERATION_Z_mm));
+    tmc4361A_setMaxSpeed(&tmc4361[i], tmc4361A_vmmToMicrosteps(&tmc4361[i], MAX_VELOCITY_Z_mm));
+    tmc4361A_setMaxAcceleration(&tmc4361[i], tmc4361A_ammToMicrosteps(&tmc4361[i], MAX_ACCELERATION_Z_mm));
     tmc4361[i].rampParam[ASTART_IDX] = 0;
     tmc4361[i].rampParam[DFINAL_IDX] = 0;
 
@@ -160,25 +156,32 @@ void setup() {
 
   tmc4361A_enableHomingLimit(&tmc4361[0], rht_sw_pol[0], TMC4361_homing_sw[0]);
   // Perform homing
-  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[z], MAX_VELOCITY_Z_mm) / 2, RGHT_DIR);
-  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[z], MAX_VELOCITY_Z_mm) / 2, LEFT_DIR);
-  tmc4361A_setHome(&tmc4361[y]);
+  SerialUSB.println("Begin inward (right)");
+  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), RGHT_DIR);
+  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
 
-  // Initialze the encoder
-  //                                    A/B transitions per rev and filter params
-  tmc4361A_init_ABN_encoder(&tmc4361[0], 400000, 32, 11, 128);
-  // Perform linearity test
-  int32_t msteps[N_TESTPOINTS];
-  int32_t encoder_readings[N_TESTPOINTS];
-  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, tmc4361[0].xmin + 20, tmc4361[0].xmax - 20, 500);
-  Serial.println(err);
-  Serial.println("Internal reading and encoder reading");
-  for (int i = 0; i < N_TESTPOINTS; i++) {
-    Serial.print(msteps[i]);
-    Serial.print(", ");
-    Serial.println(encoder_readings[i]);
+  // Move to the center - set the middle as home so distance can range from +3mm to -3 mm
+  int32_t target = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM * 1.1);
+  SerialUSB.print("Moving to center ");
+  SerialUSB.println(target);
+  tmc4361A_moveTo(&tmc4361[0], target);
+  // Wait until we reach our target
+  while(tmc4361A_currentPosition(&tmc4361[0]) != target){
+    delay(50);
   }
-  // Print out motor stats
+  // Our center position is 0
+  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
+  // Initialze the encoder
+  //                                    A/B transitions per rev and filter params 
+  tmc4361A_init_ABN_encoder(&tmc4361[0], 2983, 32, 4, 512, true);
+  // Transitions per rev calculated by =(max mstep - min mstep)/(max encoder - min encoder)*previous transition per rev setting
+  // Synchronize encoder and microsteps
+  tmc4361A_setCurrentPosition(&tmc4361[0], tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
+  SerialUSB.print("Initialized encoder. Current position: ");
+  SerialUSB.print(tmc4361A_currentPosition(&tmc4361[0]));
+  SerialUSB.print(", encoder position ");
+  SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
+      // Print out motor stats
   for (int i = 0; i < N_MOTOR; i++) {
     SerialUSB.print("Motor ");
     SerialUSB.print(i);
@@ -197,13 +200,50 @@ void setup() {
     SerialUSB.print("Max value (millimeter): ");
     SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmax));
   }
+  // // Perform linearity test
+  int32_t msteps[N_TESTPOINTS];
+  int32_t encoder_readings[N_TESTPOINTS];
+  int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
+  int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
+  SerialUSB.print("Start at ");
+  SerialUSB.print(startpoint);
+  SerialUSB.print(", end at ");
+  SerialUSB.println(endpoint);
+  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
+  switch(err){
+    case NO_ERR:
+      SerialUSB.println("Success");
+      break;
+    case ERR_OUT_OF_RANGE:
+      SerialUSB.println("Out of range");
+      break;
+    case ERR_TIMEOUT:
+      SerialUSB.println("Movement timed out");
+      break;
+    default:
+      SerialUSB.println("Unknown error");
+  }
+  for (int i = 0; i < N_TESTPOINTS; i++) {
+    SerialUSB.print(msteps[i]);
+    SerialUSB.print(", ");
+    SerialUSB.println(encoder_readings[i]);
+  }
+  // Enable PID
+  SerialUSB.println("Enable PID");
+  // target, pid, err
+  tmc4361A_init_PID(&tmc4361[0], 25, 25, 512, 64, 0, tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), 4096, 2);
+  tmc4361A_set_PID(&tmc4361[0], PID_BPG0);
   // Print serial commands
   SerialUSB.println("Syntax:");
-  SerialUSB.println("[s|S|r|R] <index> <setpoint>");
+  SerialUSB.println("[s|S|r|R|o|O|q|Q] <index> <setpoint>");
   SerialUSB.println("s: Set the absolute target position in units microsteps");
   SerialUSB.println("S: Set the absolute target position in units millimeters");
   SerialUSB.println("r: Set the relative target position in units microsteps");
   SerialUSB.println("R: Set the relative target position in units millimeters");
+  SerialUSB.println("o: Set the absolute target position in units microsteps with anti-stick feature");
+  SerialUSB.println("O: Set the absolute target position in units millimeters with anti-stick feature");
+  SerialUSB.println("q: Set the relative target position in units microsteps with anti-stick feature");
+  SerialUSB.println("Q: Set the relative target position in units millimeters with anti-stick feature");
 
   SerialUSB.println("[u|U] <index> <setpoint>");
   SerialUSB.println("u: Set the target velocity in units microsteps/s");
@@ -228,6 +268,9 @@ void setup() {
   SerialUSB.println("[t|T] <index>");
   SerialUSB.println("t: print target position in units microsteps");
   SerialUSB.println("T: print target position in units millimeters");
+
+  SerialUSB.println("e <index>");
+  SerialUSB.println("e: get the encoder position");
 
   SerialUSB.print("Index selects which motor to read, in range 1 to ");
   SerialUSB.println(N_MOTOR);
@@ -254,8 +297,8 @@ void loop() {
     }
     index--;
     // debugging - status
-    SerialUSB.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_STATUS), BIN);
-    SerialUSB.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS), BIN);
+    // SerialUSB.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_STATUS), BIN);
+    // SerialUSB.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_EVENTS), BIN);
     // Parse cmd
     switch (cmd) {
       case 'p': // Print
@@ -329,6 +372,30 @@ void loop() {
         }
         SerialUSB.print(tmc4361A_move(&tmc4361[index], target));
         break;
+      case 'O': // Movement
+      case 'o':
+        SerialUSB.println("Abs Move no stick");
+        if (cmd == 'O') {
+          tmp = SerialUSB.parseFloat();
+          target = tmc4361A_xmmToMicrosteps(&tmc4361[index], tmp);
+        }
+        else {
+          target = SerialUSB.parseInt();
+        }
+        SerialUSB.print(tmc4361A_moveTo_no_stick(&tmc4361[index], target, tmc4361A_xmmToMicrosteps(&tmc4361[index], .1), ENCODER_ERROR_TOLERANCE, 10000));
+        break;
+      case 'Q':
+      case 'q':
+        SerialUSB.println("Rel Move no stick");
+        if (cmd == 'Q') {
+          tmp = SerialUSB.parseFloat();
+          target = tmc4361A_xmmToMicrosteps(&tmc4361[index], tmp);
+        }
+        else {
+          target = SerialUSB.parseInt();
+        }
+        SerialUSB.print(tmc4361A_move_no_stick(&tmc4361[index], target, tmc4361A_xmmToMicrosteps(&tmc4361[index], .1), ENCODER_ERROR_TOLERANCE, 10000));
+        break;
 
       case 'U':
       case 'u':
@@ -377,6 +444,10 @@ void loop() {
         // If we have a write command, store the command for processing later
         SerialUSB.read();       // Read and throw out the space
         cmd = SerialUSB.read(); // Store the command
+        break;
+      case 'e':
+        SerialUSB.print("Encoder reading: ");
+        SerialUSB.println(tmc4361A_read_encoder(&tmc4361[index],  N_ENC_AVG_EXP));
         break;
       default:
         SerialUSB.println("Not recognized");
@@ -430,4 +501,7 @@ void loop() {
     default:
       break;
   }
+  // Test PID: uncomment the read_deviation println to see the PID error signal printed every loop
+  //  SerialUSB.println(tmc4361A_read_deviation(&tmc4361[0]));
+  // SerialUSB.println(tmc4361A_readInt(&tmc4361[index], TMC4361A_STATUS), BIN);
 }
