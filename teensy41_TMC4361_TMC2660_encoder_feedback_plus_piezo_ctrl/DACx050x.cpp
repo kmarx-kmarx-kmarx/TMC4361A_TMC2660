@@ -128,6 +128,9 @@ uint16_t DACx050x::write(uint8_t reg, uint16_t data) {
 void DACx050x::begin(SPIClass &port) {
   uint16_t datagram;
 
+  pinMode(cs_, OUTPUT);
+  digitalWrite(cs_, HIGH);
+
   spi_ = &port;
   settings_ = SPISettings(DACx050x_CLK, MSBFIRST, SPI_MODE2);
 
@@ -146,7 +149,7 @@ void DACx050x::begin(SPIClass &port) {
 
 void DACx050x::output(uint8_t channel_num, uint16_t value) {
   uint8_t addr = 0b1000 | channel_num;
-  this->write(addr, DACx050x_SOFT_RST);
+  this->write(addr, value);
 }
 
 void DACx050x::reset() {

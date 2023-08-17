@@ -60,8 +60,6 @@ TMC4361ATypeDef tmc4361[N_MOTOR];
 
 // Initialization routines
 void setup() {
-  pinMode(33, OUTPUT);
-  digitalWrite(33, HIGH);
   // Initialize serial on the Teensy
   SerialUSB.begin(20000000);
   delay(1000);
@@ -91,7 +89,7 @@ void setup() {
   delayMicroseconds(50);
   // Initialize the DAC
   dac.begin(SPI);
-
+  
   // initilize TMC4361 and TMC2660 - turn on functionality
   for (int i = 0; i < N_MOTOR; i++) {
     // set up ICs with SPI control and other parameters
@@ -162,83 +160,83 @@ void setup() {
 
   tmc4361A_enableHomingLimit(&tmc4361[0], rht_sw_pol[0], TMC4361_homing_sw[0]);
   // Perform homing
-  SerialUSB.println("Begin inward (right)");
-  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), RGHT_DIR);
-  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
-
-  // Move to the center - set the middle as home so distance can range from +3mm to -3 mm
-  int32_t target = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM * 1.1);
-  SerialUSB.print("Moving to center ");
-  SerialUSB.println(target);
-  tmc4361A_moveTo(&tmc4361[0], target);
-  // Wait until we reach our target
-  while(tmc4361A_currentPosition(&tmc4361[0]) != target){
-    delay(50);
-  }
-  // Our center position is 0
-  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
-  // Initialze the encoder
-  //                                    A/B transitions per rev and filter params 
-  tmc4361A_init_ABN_encoder(&tmc4361[0], 3000, 32, 4, 512, true);
-  // Transitions per rev calculated by =(max mstep - min mstep)/(max encoder - min encoder)*previous transition per rev setting
-  // Synchronize encoder and microsteps
-  tmc4361A_setCurrentPosition(&tmc4361[0], tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
-  SerialUSB.print("Initialized encoder. Current position: ");
-  SerialUSB.print(tmc4361A_currentPosition(&tmc4361[0]));
-  SerialUSB.print(", encoder position ");
-  SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
-      // Print out motor stats
-  for (int i = 0; i < N_MOTOR; i++) {
-    SerialUSB.print("Motor ");
-    SerialUSB.print(i);
-    SerialUSB.print(" on pin ");
-    SerialUSB.println(pin_TMC4361_CS[i]);
-    SerialUSB.print("Min value (microstep): ");
-    SerialUSB.println(tmc4361[i].xmin);
-    SerialUSB.print("Home pos (microstep):  ");
-    SerialUSB.println(tmc4361[i].xhome);
-    SerialUSB.print("Max value (microstep): ");
-    SerialUSB.println(tmc4361[i].xmax);
-    SerialUSB.print("Min value (millimeter): ");
-    SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmin));
-    SerialUSB.print("Home pos (millimeter):  ");
-    SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xhome));
-    SerialUSB.print("Max value (millimeter): ");
-    SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmax));
-  }
-  // // Perform linearity test
-  int32_t msteps[N_TESTPOINTS];
-  int32_t encoder_readings[N_TESTPOINTS];
-  int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
-  int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
-  SerialUSB.print("Start at ");
-  SerialUSB.print(startpoint);
-  SerialUSB.print(", end at ");
-  SerialUSB.println(endpoint);
-  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
-  switch(err){
-    case NO_ERR:
-      SerialUSB.println("Success");
-      break;
-    case ERR_OUT_OF_RANGE:
-      SerialUSB.println("Out of range");
-      break;
-    case ERR_TIMEOUT:
-      SerialUSB.println("Movement timed out");
-      break;
-    default:
-      SerialUSB.println("Unknown error");
-  }
-  for (int i = 0; i < N_TESTPOINTS; i++) {
-    SerialUSB.print(msteps[i]);
-    SerialUSB.print(", ");
-    SerialUSB.println(encoder_readings[i]);
-  }
-  // Enable PID
-  SerialUSB.println("Enable PID");
-  // target, pid, err
-  tmc4361A_init_PID(&tmc4361[0], 25, 25, 512, 64, 0, tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), 4096, 2);
-  tmc4361A_set_PID(&tmc4361[0], PID_BPG0);
+  //  SerialUSB.println("Begin inward (right)");
+  //  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), RGHT_DIR);
+  //  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
+  //
+  //  // Move to the center - set the middle as home so distance can range from +3mm to -3 mm
+  //  int32_t target = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM * 1.1);
+  //  SerialUSB.print("Moving to center ");
+  //  SerialUSB.println(target);
+  //  tmc4361A_moveTo(&tmc4361[0], target);
+  //  // Wait until we reach our target
+  //  while(tmc4361A_currentPosition(&tmc4361[0]) != target){
+  //    delay(50);
+  //  }
+  //  // Our center position is 0
+  //  tmc4361A_setCurrentPosition(&tmc4361[0], 0);
+  //  // Initialze the encoder
+  //  //                                    A/B transitions per rev and filter params
+  //  tmc4361A_init_ABN_encoder(&tmc4361[0], 3000, 32, 4, 512, true);
+  //  // Transitions per rev calculated by =(max mstep - min mstep)/(max encoder - min encoder)*previous transition per rev setting
+  //  // Synchronize encoder and microsteps
+  //  tmc4361A_setCurrentPosition(&tmc4361[0], tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
+  //  SerialUSB.print("Initialized encoder. Current position: ");
+  //  SerialUSB.print(tmc4361A_currentPosition(&tmc4361[0]));
+  //  SerialUSB.print(", encoder position ");
+  //  SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
+  //      // Print out motor stats
+  //  for (int i = 0; i < N_MOTOR; i++) {
+  //    SerialUSB.print("Motor ");
+  //    SerialUSB.print(i);
+  //    SerialUSB.print(" on pin ");
+  //    SerialUSB.println(pin_TMC4361_CS[i]);
+  //    SerialUSB.print("Min value (microstep): ");
+  //    SerialUSB.println(tmc4361[i].xmin);
+  //    SerialUSB.print("Home pos (microstep):  ");
+  //    SerialUSB.println(tmc4361[i].xhome);
+  //    SerialUSB.print("Max value (microstep): ");
+  //    SerialUSB.println(tmc4361[i].xmax);
+  //    SerialUSB.print("Min value (millimeter): ");
+  //    SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmin));
+  //    SerialUSB.print("Home pos (millimeter):  ");
+  //    SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xhome));
+  //    SerialUSB.print("Max value (millimeter): ");
+  //    SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmax));
+  //  }
+  //  // // Perform linearity test
+  //  int32_t msteps[N_TESTPOINTS];
+  //  int32_t encoder_readings[N_TESTPOINTS];
+  //  int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
+  //  int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
+  //  SerialUSB.print("Start at ");
+  //  SerialUSB.print(startpoint);
+  //  SerialUSB.print(", end at ");
+  //  SerialUSB.println(endpoint);
+  //  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
+  //  switch(err){
+  //    case NO_ERR:
+  //      SerialUSB.println("Success");
+  //      break;
+  //    case ERR_OUT_OF_RANGE:
+  //      SerialUSB.println("Out of range");
+  //      break;
+  //    case ERR_TIMEOUT:
+  //      SerialUSB.println("Movement timed out");
+  //      break;
+  //    default:
+  //      SerialUSB.println("Unknown error");
+  //  }
+  //  for (int i = 0; i < N_TESTPOINTS; i++) {
+  //    SerialUSB.print(msteps[i]);
+  //    SerialUSB.print(", ");
+  //    SerialUSB.println(encoder_readings[i]);
+  //  }
+  //  // Enable PID
+  //  SerialUSB.println("Enable PID");
+  //  // target, pid, err
+  //  tmc4361A_init_PID(&tmc4361[0], 25, 25, 512, 64, 0, tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), 4096, 2);
+  //  tmc4361A_set_PID(&tmc4361[0], PID_BPG0);
   // Print serial commands
   SerialUSB.println("Syntax:");
   SerialUSB.println("[s|S|r|R|o|O|q|Q] <index> <setpoint>");
@@ -278,15 +276,16 @@ void setup() {
   SerialUSB.println("e <index>");
   SerialUSB.println("e: get the encoder position");
 
-  SerialUSB.println("D <volts>");
-  SerialUSB.println("D: set DAC output voltage");
+  SerialUSB.println("[d|D] <intensity>");
+  SerialUSB.println("d: set DAC output intensity (0 to 65535)");
+  SerialUSB.println("D: set DAC output voltage in volts (0 to 5)");
 
   SerialUSB.print("Index selects which motor to read, in range 1 to ");
   SerialUSB.println(N_MOTOR);
 }
 
 void loop() {
-  int32_t index, target;
+  int32_t index, target, index_max;
   float tmp;
   char cmd;
 
@@ -300,7 +299,11 @@ void loop() {
       return;
     }
     // Parse index first; if parseInt times out, index = 0
-    if (index <= 0 || index > N_MOTOR) {
+    index_max = N_MOTOR;
+    if ((cmd == 'd') || (cmd == 'D'))
+      index_max = 8;
+
+    if (index <= 0 || index > index_max) {
       SerialUSB.println("Index OOB or timeout");
       return;
     }
@@ -459,14 +462,22 @@ void loop() {
         SerialUSB.println(tmc4361A_read_encoder(&tmc4361[index],  N_ENC_AVG_EXP));
         break;
       case 'D':
-        tmp = SerialUSB.parseFloat();
-        tmp = constrain(tmp, 0, 5);
-        tmp = tmp / 5;
-        target = tmp * ((1<<16)-1);
+      case 'd':
+        if (cmd == 'D') {
+          tmp = SerialUSB.parseFloat();
+          tmp = constrain(tmp, 0, 5);
+          tmp = tmp / 5;
+          target = tmp * ((1 << 16) - 1);
+        }
+        else {
+          target = SerialUSB.parseInt();
+        }
 
-        dac.output(7, target);
-
-        SerialUSB.println("Setting output");
+        dac.output(index, target);
+        SerialUSB.print("Setting output ");
+        SerialUSB.print(index);
+        SerialUSB.print(": ");
+        SerialUSB.println(target);
         break;
       default:
         SerialUSB.println("Not recognized");
