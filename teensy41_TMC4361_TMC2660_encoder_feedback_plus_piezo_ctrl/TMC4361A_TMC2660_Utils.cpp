@@ -239,7 +239,7 @@ void tmc4361A_cScaleInit(TMC4361ATypeDef *tmc4361A) {
                     (tmc4361A->cscaleParam[BSTSCALE_IDX]  << TMC4361A_BOOST_SCALE_VAL_SHIFT));  // Set boost scale (0 to 255)
   tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current scale
   tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
-  
+
   return;
 }
 
@@ -1264,7 +1264,7 @@ int32_t tmc4361A_targetPosition(TMC4361ATypeDef *tmc4361A) {
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
 
-  RETURNS: 
+  RETURNS:
       int8_t err: NO_ERR if the new xmin, xmax, and xhome don't hit the min/max int32_t values and ERR_OUT_OF_RANGE if they do
 
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
@@ -1290,51 +1290,51 @@ int8_t tmc4361A_setCurrentPosition(TMC4361ATypeDef *tmc4361A, int32_t position) 
   int32_t xmax  = tmc4361A->xmax;
   int32_t xmin  = tmc4361A->xmin;
   int32_t xhome = tmc4361A->xhome;
-  if(dif > 0){
+  if (dif > 0) {
     // perform addition overflow check
-    if(xmax > INT32_MAX-dif){
+    if (xmax > INT32_MAX - dif) {
       err = ERR_OUT_OF_RANGE;
       xmax = INT32_MAX;
     }
-    else{
+    else {
       xmax += dif;
     }
-    if(xmin > INT32_MAX-dif){
+    if (xmin > INT32_MAX - dif) {
       err = ERR_OUT_OF_RANGE;
       xmin = INT32_MAX;
     }
-    else{
+    else {
       xmin += dif;
     }
-    if(xhome > INT32_MAX-dif){
+    if (xhome > INT32_MAX - dif) {
       err = ERR_OUT_OF_RANGE;
       xhome = INT32_MAX;
     }
-    else{
+    else {
       xhome += dif;
     }
   }
-  else{
+  else {
     // perform subtraction overflow check
-    if(xmax < INT32_MIN-dif){
+    if (xmax < INT32_MIN - dif) {
       err = ERR_OUT_OF_RANGE;
       xmax = INT32_MIN;
     }
-    else{
+    else {
       xmax += dif;
     }
-    if(xmin < INT32_MIN-dif){
+    if (xmin < INT32_MIN - dif) {
       err = ERR_OUT_OF_RANGE;
       xmin = INT32_MIN;
     }
-    else{
+    else {
       xmin += dif;
     }
-    if(xhome < INT32_MIN-dif){
+    if (xhome < INT32_MIN - dif) {
       err = ERR_OUT_OF_RANGE;
       xmin = INT32_MIN;
     }
-    else{
+    else {
       xhome += dif;
     }
   }
@@ -1527,7 +1527,7 @@ float   tmc4361A_amicrostepsTomm(TMC4361ATypeDef *tmc4361A, int32_t microsteps) 
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean, bool invert){
+void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint8_t filter_wait_time, uint8_t filter_exponent, uint16_t filter_vmean, bool invert) {
   uint32_t datagram;
 
   datagram = enc_res & TMC4361A_ENC_IN_RES_MASK; // ensure manual mode bit isn't set
@@ -1538,7 +1538,7 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
   tmc4361A_writeInt(tmc4361A, TMC4361A_ENC_VMEAN_FILTER_WR, datagram);
 
   // set whether or not to invert
-  if(invert){
+  if (invert) {
     tmc4361A_setBits(tmc4361A, TMC4361A_ENC_IN_CONF, TMC4361A_INVERT_ENC_DIR_MASK);
   }
 
@@ -1568,19 +1568,19 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A, uint8_t n_avg_exp){
+int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A, uint8_t n_avg_exp) {
   int32_t reading = 0;
-  for(uint8_t j = 0; j < (1<<n_avg_exp); j++){
-      reading += tmc4361A_readInt(tmc4361A, TMC4361A_ENC_POS) >> n_avg_exp;
-      delay(1);
-    }
+  for (uint8_t j = 0; j < (1 << n_avg_exp); j++) {
+    reading += tmc4361A_readInt(tmc4361A, TMC4361A_ENC_POS) >> n_avg_exp;
+    delay(1);
+  }
   return reading;
 
 }
-int32_t tmc4361A_read_encoder_vel(TMC4361ATypeDef *tmc4361A){
+int32_t tmc4361A_read_encoder_vel(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_V_ENC_RD);
 }
-int32_t tmc4361A_read_encoder_vel_filtered(TMC4361ATypeDef *tmc4361A){
+int32_t tmc4361A_read_encoder_vel_filtered(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_V_ENC_MEAN_RD);
 }
 /*
@@ -1606,13 +1606,13 @@ int32_t tmc4361A_read_encoder_vel_filtered(TMC4361ATypeDef *tmc4361A){
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-int32_t tmc4361A_read_deviation(TMC4361ATypeDef *tmc4361A){
+int32_t tmc4361A_read_deviation(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_ENC_POS_DEV_RD);
 }
 /*
   -----------------------------------------------------------------------------
   This function doesn't work. It appeas the problem is that the deviation error tolerance isn't being written properly so the flag never gets raised.
-  DESCRIPTION: tmc4361A_read_deviation_flag() returns True if the difference between XACTUAL and ENC_POS exceeds 
+  DESCRIPTION: tmc4361A_read_deviation_flag() returns True if the difference between XACTUAL and ENC_POS exceeds
 
   OPERATION:   We read the relevant registers.
 
@@ -1633,7 +1633,7 @@ int32_t tmc4361A_read_deviation(TMC4361ATypeDef *tmc4361A){
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-bool tmc4361A_read_deviation_flag(TMC4361ATypeDef *tmc4361A){
+bool tmc4361A_read_deviation_flag(TMC4361ATypeDef *tmc4361A) {
   uint32_t datagram = tmc4361A_readInt(tmc4361A, TMC4361A_STATUS);
   datagram = datagram & TMC4361A_ENC_FAIL_MASK;
   return datagram >> TMC4361A_ENC_FAIL_SHIFT;
@@ -1641,7 +1641,7 @@ bool tmc4361A_read_deviation_flag(TMC4361ATypeDef *tmc4361A){
 
 /*
   -----------------------------------------------------------------------------
-  DESCRIPTION: tmc4361A_set_PID() enables or disables PID 
+  DESCRIPTION: tmc4361A_set_PID() enables or disables PID
 
   OPERATION:   We have 3 "modes" we can set:
                 PID_DISABLE: Disables PID
@@ -1667,7 +1667,7 @@ bool tmc4361A_read_deviation_flag(TMC4361ATypeDef *tmc4361A){
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode){
+void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode) {
   tmc4361A_rstBits(tmc4361A, TMC4361A_ENC_IN_CONF, TMC4361A_REGULATION_MODUS_MASK);
   tmc4361A_setBits(tmc4361A, TMC4361A_ENC_IN_CONF, pid_mode << TMC4361A_REGULATION_MODUS_SHIFT);
   return;
@@ -1689,8 +1689,8 @@ void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode){
       uint32_t pid_dclip:        Limits the speed to be at most pid_dclip
       uint32_t pid_iclip:        15-bit integral winding limit, limit = pid_iclip * 2^16
       uint8_t pid_d_clkdiv:      For the derivate term of the PID control, PID_E will be compared to its former value every PID_D_CLK_DIV*128 / fCLK seconds
- 
- 
+
+
   RETURNS: None
 
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
@@ -1705,7 +1705,7 @@ void tmc4361A_set_PID(TMC4361ATypeDef *tmc4361A, uint8_t pid_mode){
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uint32_t pid_tolerance, uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv){
+void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uint32_t pid_tolerance, uint32_t pid_p, uint32_t pid_i, uint32_t pid_d, uint32_t pid_dclip, uint32_t pid_iclip, uint8_t pid_d_clkdiv) {
   uint32_t datagram;
 
   tmc4361A_writeInt(tmc4361A, TMC4361A_CL_TR_TOLERANCE_WR, target_tolerance);   // Set the TARGET_REACHED tolerance
@@ -1734,8 +1734,8 @@ void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uin
 
                This also can be run with the PID loop active to compare the different results.
 
-  OPERATION:   We first use the start_pos, end_pos, and n_measurements to find the step size. 
-               Next, we set start_pos as our setpoint and wait until we reach there. 
+  OPERATION:   We first use the start_pos, end_pos, and n_measurements to find the step size.
+               Next, we set start_pos as our setpoint and wait until we reach there.
                Then, we record the encoder and microstep readings into the shared array.
                We then move by our step size and repeat.
                If we hit a limit switch during any point or time out when trying to reach a target,
@@ -1749,7 +1749,7 @@ void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uin
       int32_t start_pos:         Initial position to start the sweep
       int32_t end_pos:           Position to end the sweep. Due to rounding errors, we might not get all the way there.
       uint16_t timeout_ms:       If it takes longer than timeout_ms to hit the target, give up and return an error.
- 
+
   RETURNS: None
 
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
@@ -1768,23 +1768,23 @@ void tmc4361A_init_PID(TMC4361ATypeDef *tmc4361A, uint32_t target_tolerance, uin
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_reading, int32_t *internal_reading, uint8_t n_measurements, int32_t start_pos, int32_t end_pos, uint16_t timeout_ms){
-  int32_t step_size = (end_pos - start_pos)/(n_measurements - 1);
+int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_reading, int32_t *internal_reading, uint8_t n_measurements, int32_t start_pos, int32_t end_pos, uint16_t timeout_ms) {
+  int32_t step_size = (end_pos - start_pos) / (n_measurements - 1);
   uint32_t t0;
   int32_t target;
   int8_t err;
-  
-  for(uint8_t i = 0; i < n_measurements; i++){
+
+  for (uint8_t i = 0; i < n_measurements; i++) {
     // Move to the target position
     target = start_pos + (i * step_size);
     err = tmc4361A_moveTo(tmc4361A, target);
     // If there was a movement error, break.
-    if(err != NO_ERR){
+    if (err != NO_ERR) {
       break;
     }
     t0 = millis();
     // Wait until we hit the target
-    while((tmc4361A_currentPosition(tmc4361A) != target) && ((millis() - t0) < timeout_ms)){
+    while ((tmc4361A_currentPosition(tmc4361A) != target) && ((millis() - t0) < timeout_ms)) {
       delay(1);
     }
     // Get the positions
@@ -1792,12 +1792,12 @@ int8_t tmc4361A_measure_linearity(TMC4361ATypeDef *tmc4361A, int32_t *encoder_re
     encoder_reading[i] = tmc4361A_read_encoder(tmc4361A, N_ENC_AVG_EXP);
     internal_reading[i] = tmc4361A_currentPosition(tmc4361A);
     // If we didn't, break
-    if(tmc4361A_currentPosition(tmc4361A) != target){
+    if (tmc4361A_currentPosition(tmc4361A) != target) {
       err = ERR_TIMEOUT;
       break;
     }
     // Make sure we didn't hit a limit switch
-    if(tmc4361A_readLimitSwitches(tmc4361A) != 0){
+    if (tmc4361A_readLimitSwitches(tmc4361A) != 0) {
       err = ERR_OUT_OF_RANGE;
       break;
     }
@@ -1852,7 +1852,7 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
   }
   // Check which direction we are going - used to determine whether to subtract or add the backup amount
   original_position = tmc4361A_currentPosition(tmc4361A);
-  if(x_pos - original_position > 0){
+  if (x_pos - original_position > 0) {
     // If the target is more positive than the current position, the backup direction is negative
     backup_amount = backup_amount * -1;
   }
@@ -1862,9 +1862,9 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
   // Start keeping track of time, deviation, and position:
-  while(true){
+  while (true) {
     // Break and return error if we time out
-    if(millis() - t0 > timeout_ms){
+    if (millis() - t0 > timeout_ms) {
       err = ERR_TIMEOUT;
       break;
     }
@@ -1874,7 +1874,10 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
       break;
     }
     // If we have too much deviation, back up and try again
-    if(abs(tmc4361A_read_deviation(tmc4361A)) > err_thresh){
+    uint32_t deviation = abs(tmc4361A_read_deviation(tmc4361A));
+    if (deviation > err_thresh) {
+      SerialUSB.print("Error: ");
+      SerialUSB.println(deviation);
       tmc4361A_stop(tmc4361A);
       // disable PID
       tmc4361A_set_PID(tmc4361A, PID_DISABLE);
@@ -1883,9 +1886,9 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
       backup_target = backup_amount + original_position;
 
       tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, backup_target);
-      
+
       // Wait until we back up or time out
-      while((millis()-t0 < timeout_ms) && ((tmc4361A_readInt(tmc4361A, TMC4361A_STATUS) & TMC4361A_TARGET_REACHED_MASK) == 0)){
+      while ((millis() - t0 < timeout_ms) && ((tmc4361A_readInt(tmc4361A, TMC4361A_STATUS) & TMC4361A_TARGET_REACHED_MASK) == 0)) {
         delay(50);
       }
 
