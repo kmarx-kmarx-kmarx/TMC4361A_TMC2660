@@ -55,7 +55,7 @@ const int32_t vslow = 0x01FFFC00;
 #define PID_CHECK_INTERVAL_MS      500
 uint32_t pid_check_time = 0;
 
-#define N_TESTPOINTS 4 // for linearity test
+#define N_TESTPOINTS 3 // for linearity test
 
 
 void trianglewave(int32_t dac_idx, int32_t time_ms);
@@ -180,11 +180,11 @@ void setup() {
   while (tmc4361A_currentPosition(&tmc4361[0]) != target) {
     delay(50);
   }
-  // Our center position is 0
+  // Our center position is home, set to 0
   tmc4361A_setCurrentPosition(&tmc4361[0], 0);
+  tmc4361[0].xhome = 0;
   // Physical limit switch (left) is now at -3 mm
   // Set virtual limit switch (right) relative to current position at +3 mm
-  // TODO - this isn't working properly. We can exceed the 3mm limit
   target = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM * 1.01);
   tmc4361[0].xmin = -target;
   tmc4361A_setVirtualStop(&tmc4361[0], RGHT_SW, target);
@@ -218,34 +218,34 @@ void setup() {
     SerialUSB.print("Max value (millimeter): ");
     SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmax));
   }
-  //  // // Perform linearity test
-  //  int32_t msteps[N_TESTPOINTS];
-  //  int32_t encoder_readings[N_TESTPOINTS];
-  //  int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
-  //  int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
-  //  SerialUSB.print("Start at ");
-  //  SerialUSB.print(startpoint);
-  //  SerialUSB.print(", end at ");
-  //  SerialUSB.println(endpoint);
-  //  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
-  //  switch(err){
-  //    case NO_ERR:
-  //      SerialUSB.println("Success");
-  //      break;
-  //    case ERR_OUT_OF_RANGE:
-  //      SerialUSB.println("Out of range");
-  //      break;
-  //    case ERR_TIMEOUT:
-  //      SerialUSB.println("Movement timed out");
-  //      break;
-  //    default:
-  //      SerialUSB.println("Unknown error");
-  //  }
-  //  for (int i = 0; i < N_TESTPOINTS; i++) {
-  //    SerialUSB.print(msteps[i]);
-  //    SerialUSB.print(", ");
-  //    SerialUSB.println(encoder_readings[i]);
-  //  }
+  // Perform linearity test
+  int32_t msteps[N_TESTPOINTS];
+  int32_t encoder_readings[N_TESTPOINTS];
+  int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
+  int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
+  SerialUSB.print("Start at ");
+  SerialUSB.print(startpoint);
+  SerialUSB.print(", end at ");
+  SerialUSB.println(endpoint);
+  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
+  switch (err) {
+    case NO_ERR:
+      SerialUSB.println("Success");
+      break;
+    case ERR_OUT_OF_RANGE:
+      SerialUSB.println("Out of range");
+      break;
+    case ERR_TIMEOUT:
+      SerialUSB.println("Movement timed out");
+      break;
+    default:
+      SerialUSB.println("Unknown error");
+  }
+  for (int i = 0; i < N_TESTPOINTS; i++) {
+    SerialUSB.print(msteps[i]);
+    SerialUSB.print(", ");
+    SerialUSB.println(encoder_readings[i]);
+  }
   // Enable PID
   SerialUSB.println("Enable PID");
   // target, pid, err
