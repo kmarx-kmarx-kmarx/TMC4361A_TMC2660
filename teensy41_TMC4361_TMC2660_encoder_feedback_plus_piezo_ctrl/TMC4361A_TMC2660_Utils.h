@@ -59,6 +59,7 @@ int8_t tmc4361A_setMicrosteps(TMC4361ATypeDef *tmc4361A, uint16_t mstep);
 void tmc4361A_writeMicrosteps(TMC4361ATypeDef *tmc4361A);
 int8_t tmc4361A_setSPR(TMC4361ATypeDef *tmc4361A, uint16_t spr);
 void tmc4361A_writeSPR(TMC4361ATypeDef *tmc4361A);
+void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t target);
 
 
 // The following does not need to be accessed by the end user

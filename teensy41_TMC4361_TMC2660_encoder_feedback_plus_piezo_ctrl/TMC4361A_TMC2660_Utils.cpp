@@ -454,6 +454,8 @@ void tmc4361A_writeSPR(TMC4361ATypeDef *tmc4361A) {
 void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   // reset
   tmc4361A_writeInt(tmc4361A, TMC4361A_RESET_REG, 0x52535400);
+  delay(2);
+  tmc4361A_writeInt(tmc4361A, TMC4361A_RESET_REG, 0x52535400);
   // clk
   tmc4361A_writeInt(tmc4361A, TMC4361A_CLK_FREQ, clk_Hz_TMC4361);
   // SPI configuration
@@ -600,6 +602,17 @@ void tmc4361A_enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
   return;
 }
 
+void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t target) {
+  // Set VIRTUAL_STOP_[LEFT/RIGHT] with stop position in microsteps
+  uint8_t address = (which == LEFT_SW) ? TMC4361A_VIRT_STOP_LEFT : TMC4361A_VIRT_STOP_RIGHT;
+  tmc4361A_writeInt(tmc4361A, address, target);
+  // Set virtual_[left/right]_limit_en = 1 in REFERENCE_CONF
+  int32_t dat = (which == LEFT_SW) ? (1<<TMC4361A_VIRTUAL_LEFT_LIMIT_EN_SHIFT) : (1 << TMC4361A_VIRTUAL_RIGHT_LIMIT_EN_SHIFT);
+  tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, dat);
+  
+  return;
+}
+
 /*
   -----------------------------------------------------------------------------
   DESCRIPTION: tmc4361A_enableHomingLimit() enables using either the left or right limit switch for homing
@@ -660,8 +673,8 @@ void tmc4361A_enableHomingLimit(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
   -----------------------------------------------------------------------------
   DESCRIPTION: tmc4361A_readLimitSwitches() reads the limit switches and returns their state in the two low bits of a byte.
                 00 - both not pressed
-                01 - left switch pressed
-                10 - right
+                01 - right switch pressed
+                10 - left
                 11 - both
 
   OPERATION:   We read the status register, mask the irrelevant bits, and shift the relevant bits down
@@ -829,10 +842,11 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
   // Read the events register before moving
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   tmc4361A_setSpeed(tmc4361A, vel);
-  // Keep moving until we get a switch event
+  // Keep moving until we get a switch event or switch status
   while (((eventstate != RGHT_SW) && (dir == RGHT_DIR)) || ((eventstate != LEFT_SW) && (dir == LEFT_DIR))) {
     delay(5);
     eventstate = tmc4361A_readSwitchEvent(tmc4361A );
+    eventstate |= tmc4361A_readLimitSwitches(tmc4361A);
   }
   // When we do get a switch event, write the latched X
   if (dir == RGHT_DIR) {
@@ -1861,6 +1875,7 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
   // Read events before and after to clear the register
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
+  uint32_t max_deviation = 0;
   // Start keeping track of time, deviation, and position:
   while (true) {
     // Break and return error if we time out
@@ -1875,6 +1890,7 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
     }
     // If we have too much deviation, back up and try again
     uint32_t deviation = abs(tmc4361A_read_deviation(tmc4361A));
+    max_deviation = max(max_deviation, deviation);
     if (deviation > err_thresh) {
       SerialUSB.print("Error: ");
       SerialUSB.println(deviation);
@@ -1901,11 +1917,13 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
     // idle
     delay(50);
   }
+  SerialUSB.print("Max deviation: ");
+  SerialUSB.println(max_deviation);
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   // Read X_ACTUAL to get it to refresh
   tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);
 
-  return NO_ERR;
+  return err;
 }
 /*
   -----------------------------------------------------------------------------
