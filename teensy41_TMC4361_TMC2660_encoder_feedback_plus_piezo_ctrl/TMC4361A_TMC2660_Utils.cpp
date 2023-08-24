@@ -607,9 +607,9 @@ void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t t
   uint8_t address = (which == LEFT_SW) ? TMC4361A_VIRT_STOP_LEFT : TMC4361A_VIRT_STOP_RIGHT;
   tmc4361A_writeInt(tmc4361A, address, target);
   // Set virtual_[left/right]_limit_en = 1 in REFERENCE_CONF
-  int32_t dat = (which == LEFT_SW) ? (1<<TMC4361A_VIRTUAL_LEFT_LIMIT_EN_SHIFT) : (1 << TMC4361A_VIRTUAL_RIGHT_LIMIT_EN_SHIFT);
+  int32_t dat = (which == LEFT_SW) ? (1 << TMC4361A_VIRTUAL_LEFT_LIMIT_EN_SHIFT) : (1 << TMC4361A_VIRTUAL_RIGHT_LIMIT_EN_SHIFT);
   tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, dat);
-  
+
   return;
 }
 
@@ -1875,7 +1875,7 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
   // Read events before and after to clear the register
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
-  uint32_t max_deviation = 0;
+  // uint32_t max_deviation = 0;
   // Start keeping track of time, deviation, and position:
   while (true) {
     // Break and return error if we time out
@@ -1890,10 +1890,8 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
     }
     // If we have too much deviation, back up and try again
     uint32_t deviation = abs(tmc4361A_read_deviation(tmc4361A));
-    max_deviation = max(max_deviation, deviation);
+    // max_deviation = max(max_deviation, deviation);
     if (deviation > err_thresh) {
-      SerialUSB.print("Error: ");
-      SerialUSB.println(deviation);
       tmc4361A_stop(tmc4361A);
       // disable PID
       tmc4361A_set_PID(tmc4361A, PID_DISABLE);
@@ -1917,8 +1915,8 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
     // idle
     delay(50);
   }
-  SerialUSB.print("Max deviation: ");
-  SerialUSB.println(max_deviation);
+  //  SerialUSB.print("Max deviation: ");
+  //  SerialUSB.println(max_deviation);
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   // Read X_ACTUAL to get it to refresh
   tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);

@@ -56,7 +56,7 @@ const int32_t vslow = 0x01FFFC00;
 uint32_t pid_check_time = 0;
 
 #define N_TESTPOINTS 3 // for linearity test
-
+#define DO_LINEARITY_TEST false
 
 void trianglewave(int32_t dac_idx, int32_t time_ms);
 void squarewave(int32_t dac_idx, int32_t time_ms);
@@ -219,32 +219,34 @@ void setup() {
     SerialUSB.println(tmc4361A_xmicrostepsTomm(&tmc4361[i], tmc4361[i].xmax));
   }
   // Perform linearity test
-  int32_t msteps[N_TESTPOINTS];
-  int32_t encoder_readings[N_TESTPOINTS];
-  int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
-  int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
-  SerialUSB.print("Start at ");
-  SerialUSB.print(startpoint);
-  SerialUSB.print(", end at ");
-  SerialUSB.println(endpoint);
-  int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
-  switch (err) {
-    case NO_ERR:
-      SerialUSB.println("Success");
-      break;
-    case ERR_OUT_OF_RANGE:
-      SerialUSB.println("Out of range");
-      break;
-    case ERR_TIMEOUT:
-      SerialUSB.println("Movement timed out");
-      break;
-    default:
-      SerialUSB.println("Unknown error");
-  }
-  for (int i = 0; i < N_TESTPOINTS; i++) {
-    SerialUSB.print(msteps[i]);
-    SerialUSB.print(", ");
-    SerialUSB.println(encoder_readings[i]);
+  if (DO_LINEARITY_TEST) {
+    int32_t msteps[N_TESTPOINTS];
+    int32_t encoder_readings[N_TESTPOINTS];
+    int32_t endpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_NEG_LIMIT_MM);
+    int32_t startpoint = tmc4361A_xmmToMicrosteps(&tmc4361[0], Z_POS_LIMIT_MM);
+    SerialUSB.print("Start at ");
+    SerialUSB.print(startpoint);
+    SerialUSB.print(", end at ");
+    SerialUSB.println(endpoint);
+    int8_t err = tmc4361A_measure_linearity(&tmc4361[0], encoder_readings, msteps, N_TESTPOINTS, startpoint, endpoint, 5000);
+    switch (err) {
+      case NO_ERR:
+        SerialUSB.println("Success");
+        break;
+      case ERR_OUT_OF_RANGE:
+        SerialUSB.println("Out of range");
+        break;
+      case ERR_TIMEOUT:
+        SerialUSB.println("Movement timed out");
+        break;
+      default:
+        SerialUSB.println("Unknown error");
+    }
+    for (int i = 0; i < N_TESTPOINTS; i++) {
+      SerialUSB.print(msteps[i]);
+      SerialUSB.print(", ");
+      SerialUSB.println(encoder_readings[i]);
+    }
   }
   // Enable PID
   SerialUSB.println("Enable PID");
@@ -325,7 +327,7 @@ void loop() {
     }
     // Parse index first; if parseInt times out, index = 0
     index_max = N_MOTOR;
-    if ((cmd == 'd') || (cmd == 'D') || (cmd == 'n') || (cmd == 'i') || (cmd == 'I'))
+    if ((cmd == 'd') || (cmd == 'D') || (cmd == 'n') || (cmd == 'N') || (cmd == 'i') || (cmd == 'I'))
       index_max = 8;
 
     if (index <= 0 || index > index_max) {
@@ -533,6 +535,7 @@ void loop() {
         SerialUSB.println(target);
         break;
       case 'n':
+      case 'N':
         target = SerialUSB.parseInt();    // number of steps
         index_max = SerialUSB.parseInt(); // number of averages
 
@@ -541,11 +544,23 @@ void loop() {
           tmp = i * u16_MAX / target;
           dac.output(index, tmp);
           delay(100);
-          SerialUSB.print(tmp);
+          SerialUSB.print(int32_t(tmp));
           SerialUSB.print(", ");
           SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0],  index_max));
         }
+        if (cmd == 'N') {
+          for (int i = (target - 1); i >= 0; i--) {
+            // set the step
+            tmp = i * u16_MAX / target;
+            dac.output(index, tmp);
+            delay(100);
+            SerialUSB.print(int32_t(tmp));
+            SerialUSB.print(", ");
+            SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0],  index_max));
+          }
+        }
         dac.output(index, 0);
+        break;
       default:
         SerialUSB.println("Not recognized");
     }
@@ -606,8 +621,9 @@ void loop() {
     pid_check_time = millis();
     for (int i = 0; i < N_MOTOR; i++) {
       deviation = abs(tmc4361A_read_deviation(&tmc4361[i]));
-      if (deviation >= PID_DEVIATION_ERROR) {
+      if ((deviation >= PID_DEVIATION_ERROR) || (tmc4361A_readLimitSwitches(&tmc4361[0]) != 0)) {
         SerialUSB.println(deviation);
+        tmc4361A_stop(&tmc4361[i]);
         tmc4361A_set_PID(&tmc4361[i], PID_DISABLE);
         SerialUSB.print("PID disabled for motor ");
         SerialUSB.print(i + 1);
