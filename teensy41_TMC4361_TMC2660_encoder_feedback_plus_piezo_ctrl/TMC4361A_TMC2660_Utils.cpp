@@ -454,8 +454,6 @@ void tmc4361A_writeSPR(TMC4361ATypeDef *tmc4361A) {
 void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
   // reset
   tmc4361A_writeInt(tmc4361A, TMC4361A_RESET_REG, 0x52535400);
-  delay(2);
-  tmc4361A_writeInt(tmc4361A, TMC4361A_RESET_REG, 0x52535400);
   // clk
   tmc4361A_writeInt(tmc4361A, TMC4361A_CLK_FREQ, clk_Hz_TMC4361);
   // SPI configuration
@@ -521,6 +519,8 @@ void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A) {
       float pitch_mm: mm traveled per full motor revolution
       uint16_t steps_per_rev: full steps per rev
       uint16_t microsteps: number of microsteps per fullstep. must be a power of 2 from 1 to 256.
+      uint8_t dac_idx: DAC associated with this stage. Set to NO_DAC of there isn't one
+      uint32_t dac_fullscale_msteps: abs(mstep when voltage set to 0 - mstep when voltage set to 5V); used for setting the position using the piezo
   RETURNS: None
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
   LOCAL VARIABLES: None
@@ -530,7 +530,7 @@ void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A) {
   DEPENDENCIES: tmc4316A.h
   -----------------------------------------------------------------------------
 */
-void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, float tmc4361a_hold_scale_val, float tmc4361a_drv2_scale_val, float tmc4361a_drv1_scale_val, float tmc4361a_boost_scale_val, float pitch_mm, uint16_t steps_per_rev, uint16_t microsteps) {
+void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, float tmc4361a_hold_scale_val, float tmc4361a_drv2_scale_val, float tmc4361a_drv1_scale_val, float tmc4361a_boost_scale_val, float pitch_mm, uint16_t steps_per_rev, uint16_t microsteps, uint8_t dac_idx, uint32_t dac_fullscale_msteps) {
 
   tmc4361A->cscaleParam[0] = uint8_t(tmc2660_cscale * 31);
   tmc4361A->cscaleParam[1] = uint8_t(tmc4361a_hold_scale_val * 255);
@@ -540,6 +540,10 @@ void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, fl
   tmc4361A_setPitch(tmc4361A, pitch_mm);
   tmc4361A_setSPR(tmc4361A, steps_per_rev);
   tmc4361A_setMicrosteps(tmc4361A, microsteps);
+
+  tmc4361A->dac_idx = dac_idx;
+  tmc4361A->dac_fullscale_msteps = dac_fullscale_msteps;
+
   return;
 }
 
@@ -1562,7 +1566,7 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
   -----------------------------------------------------------------------------
   DESCRIPTION: tmc4361A_read_encoder(), tmc4361A_read_encoder_filtered() reads the encoder and filtered encoder values respectively
 
-  OPERATION:   We read the relevant registers.
+  OPERATION:   We read the relevant registers. We wait 500 us between each reading so this function blocks for at least 2^(n_avg_exp - 1) milliseconds
 
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
@@ -1572,7 +1576,8 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
 
   INPUTS / OUTPUTS: The CS pin and SPI MISO and MOSI pins output, input, and output data respectively
 
-  LOCAL VARIABLES: None
+  LOCAL VARIABLES:
+      double reading: stores the intermediate values
 
   SHARED VARIABLES:
       TMC4361ATypeDef *tmc4361A: Values are read from the struct
@@ -1583,13 +1588,13 @@ void tmc4361A_init_ABN_encoder(TMC4361ATypeDef *tmc4361A, uint32_t enc_res, uint
   -----------------------------------------------------------------------------
 */
 int32_t tmc4361A_read_encoder(TMC4361ATypeDef *tmc4361A, uint8_t n_avg_exp) {
-  int32_t reading = 0;
+  double reading = 0;
   for (uint8_t j = 0; j < (1 << n_avg_exp); j++) {
-    reading += tmc4361A_readInt(tmc4361A, TMC4361A_ENC_POS) >> n_avg_exp;
-    delay(1);
+    reading += double(tmc4361A_readInt(tmc4361A, TMC4361A_ENC_POS)) / (double(1 << n_avg_exp));
+    delayMicroseconds(500);
   }
-  return reading;
 
+  return reading;
 }
 int32_t tmc4361A_read_encoder_vel(TMC4361ATypeDef *tmc4361A) {
   return tmc4361A_readInt(tmc4361A, TMC4361A_V_ENC_RD);
@@ -1875,7 +1880,6 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
   // Read events before and after to clear the register
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   tmc4361A_writeInt(tmc4361A, TMC4361A_X_TARGET, x_pos);
-  // uint32_t max_deviation = 0;
   // Start keeping track of time, deviation, and position:
   while (true) {
     // Break and return error if we time out
@@ -1890,7 +1894,6 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
     }
     // If we have too much deviation, back up and try again
     uint32_t deviation = abs(tmc4361A_read_deviation(tmc4361A));
-    // max_deviation = max(max_deviation, deviation);
     if (deviation > err_thresh) {
       tmc4361A_stop(tmc4361A);
       // disable PID
@@ -1915,8 +1918,6 @@ int8_t tmc4361A_moveTo_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_
     // idle
     delay(50);
   }
-  //  SerialUSB.print("Max deviation: ");
-  //  SerialUSB.println(max_deviation);
   tmc4361A_readInt(tmc4361A, TMC4361A_EVENTS);
   // Read X_ACTUAL to get it to refresh
   tmc4361A_readInt(tmc4361A, TMC4361A_XACTUAL);

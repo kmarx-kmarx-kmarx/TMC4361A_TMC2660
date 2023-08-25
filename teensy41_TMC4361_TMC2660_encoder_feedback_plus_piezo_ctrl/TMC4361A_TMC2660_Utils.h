@@ -4,7 +4,7 @@
 
     Created on: 7/8/2022
         Author: Kevin Marx
-    
+
     With additions and modifications from Hongquan Li 8/3/2022
 */
 #ifndef TMC_UTILS_H_
@@ -13,10 +13,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <SPI.h>
+#include "DACx050x.h"
 #include "TMC4361A.h"
 
 // Functions for user-facing API
-void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, float tmc4361a_hold_scale_val, float tmc4361a_drv2_scale_val, float tmc4361a_drv1_scale_val, float tmc4361a_boost_scale_val, float pitch_mm, uint16_t steps_per_rev, uint16_t microsteps);
+void tmc4361A_tmc2660_config(TMC4361ATypeDef *tmc4361A, float tmc2660_cscale, float tmc4361a_hold_scale_val, float tmc4361a_drv2_scale_val, float tmc4361a_drv1_scale_val, float tmc4361a_boost_scale_val, float pitch_mm, uint16_t steps_per_rev, uint16_t microsteps, uint8_t dac_idx = NO_DAC, uint32_t dac_fullscale_msteps = 0);
 void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361);
 void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A);
 void tmc4361A_setMaxSpeed(TMC4361ATypeDef *tmc4361A, int32_t velocity);
@@ -61,7 +62,6 @@ int8_t tmc4361A_setSPR(TMC4361ATypeDef *tmc4361A, uint16_t spr);
 void tmc4361A_writeSPR(TMC4361ATypeDef *tmc4361A);
 void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t target);
 
-
 // The following does not need to be accessed by the end user
 // Default motor settings - can override using tmc4361A_setPitch(), tmc4361A_setMicrosteps(), tmc4361A_setSPR()
 #define DEFAULT_PITCH        (float)2.54 // carriage parameter - 1 rotation is 2.54 mm
@@ -90,7 +90,7 @@ static const uint8_t TMC2660_TMC4361A_defaultCscaleval[N_CPARAM] = {TMC2660_CSCA
 #define RGHT_SW 0b10
 #define LEFT_DIR -1
 #define RGHT_DIR  1
-#define BOWMAX ((1<<24) - 1) 
+#define BOWMAX ((1<<24) - 1)
 #define ACCELMAX ((1 << 24) - 1)
 
 // Encoder IIR params

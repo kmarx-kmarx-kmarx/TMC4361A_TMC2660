@@ -33,6 +33,8 @@
 #define DRV1SCALE_IDX 3
 #define BSTSCALE_IDX  4
 
+#define NO_DAC 255
+
 // Helper macros
 #define TMC4361A_FIELD_READ(tdef, address, mask, shift) \
   FIELD_GET(tmc4361A_readInt(tdef, address), mask, shift)
@@ -57,6 +59,8 @@ typedef struct
   float   threadPitch;
   uint16_t stepsPerRev;
   uint16_t microsteps;
+  uint8_t dac_idx;
+  uint32_t dac_fullscale_msteps;
   
   //TMotorConfig motorConfig;
   //TClosedLoopConfig closedLoopConfig;
