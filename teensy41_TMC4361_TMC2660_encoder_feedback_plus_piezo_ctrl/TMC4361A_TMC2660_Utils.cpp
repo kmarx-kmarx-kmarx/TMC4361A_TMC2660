@@ -497,8 +497,6 @@ void tmc4361A_tmc2660_init(TMC4361ATypeDef *tmc4361A, uint32_t clk_Hz_TMC4361) {
 void tmc4361A_tmc2660_update(TMC4361ATypeDef *tmc4361A) {
   // current scaling
   tmc4361A_cScaleInit(tmc4361A);
-  tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_DRIVE_CURRENT_SCALE_EN_MASK); // keep drive current scale
-  tmc4361A_setBits(tmc4361A, TMC4361A_CURRENT_CONF, TMC4361A_HOLD_CURRENT_SCALE_EN_MASK);  // keep hold current scale
   // microstepping setting
   tmc4361A_writeMicrosteps(tmc4361A);
   tmc4361A_writeSPR(tmc4361A);
