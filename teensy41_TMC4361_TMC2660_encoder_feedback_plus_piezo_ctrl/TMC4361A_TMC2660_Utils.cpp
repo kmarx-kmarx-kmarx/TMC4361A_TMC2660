@@ -604,6 +604,9 @@ void tmc4361A_enableLimitSwitch(TMC4361ATypeDef *tmc4361A, uint8_t polarity, uin
   return;
 }
 
+
+// todo: clean up virtual stop code and add documentation
+
 void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t target) {
   // Set VIRTUAL_STOP_[LEFT/RIGHT] with stop position in microsteps
   uint8_t address = (which == LEFT_SW) ? TMC4361A_VIRT_STOP_LEFT : TMC4361A_VIRT_STOP_RIGHT;
@@ -611,6 +614,8 @@ void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t t
   // Set virtual_[left/right]_limit_en = 1 in REFERENCE_CONF
   int32_t dat = (which == LEFT_SW) ? (1 << TMC4361A_VIRTUAL_LEFT_LIMIT_EN_SHIFT) : (1 << TMC4361A_VIRTUAL_RIGHT_LIMIT_EN_SHIFT);
   tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, dat);
+  // enable hard stopping
+  tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, (1<<TMC4361A_VIRT_STOP_MODE_SHIFT));
 
   return;
 }

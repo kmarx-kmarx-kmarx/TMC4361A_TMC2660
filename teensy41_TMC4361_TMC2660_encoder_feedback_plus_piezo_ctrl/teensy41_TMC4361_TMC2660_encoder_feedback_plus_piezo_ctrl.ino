@@ -38,7 +38,7 @@
 #include "TMC4361A_TMC2660_Utils.h"
 #include "octopi.h"
 #include "DACx050x.h"
-
+#include "SETPIEZO.h"
 // Config the DAC
 DACx050x dac(33);
 
@@ -87,7 +87,7 @@ void setup() {
 
   // Motor configurations
   // 0.22 ohm -> 1 A; 0.15 ohm -> 1.47 A
-  tmc4361A_tmc2660_config(&tmc4361[0], (Z_MOTOR_RMS_CURRENT_mA / 1000)*R_sense_z / 0.2298, Z_MOTOR_I_HOLD, 1, 1, 1, SCREW_PITCH_Z_MM, FULLSTEPS_PER_REV_Z, MICROSTEPPING_Z); // need to make current scaling on TMC2660 is > 16 (out of 31)
+  tmc4361A_tmc2660_config(&tmc4361[0], (Z_MOTOR_RMS_CURRENT_mA / 1000)*R_sense_z / 0.2298, Z_MOTOR_I_HOLD, 1, 1, 1, SCREW_PITCH_Z_MM, FULLSTEPS_PER_REV_Z, MICROSTEPPING_Z, 7, 2475); // need to make current scaling on TMC2660 is > 16 (out of 31)
 
 
   // Initialize SPI - included in Utils.h
@@ -195,6 +195,11 @@ void setup() {
   // Transitions per rev calculated by =(max mstep - min mstep)/(max encoder - min encoder)*previous transition per rev setting
   // Synchronize encoder and microsteps
   tmc4361A_setCurrentPosition(&tmc4361[0], tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
+  // Calibrate the piezo
+  piezo_calibrate_limits(&tmc4361[0], &dac, 1);
+  SerialUSB.print("Calibrated piezo: ");
+  SerialUSB.println(tmc4361[0].dac_fullscale_msteps);
+
   SerialUSB.print("Initialized encoder. Current position: ");
   SerialUSB.print(tmc4361A_currentPosition(&tmc4361[0]));
   SerialUSB.print(", encoder position ");
@@ -254,61 +259,65 @@ void setup() {
   tmc4361A_init_PID(&tmc4361[0], 25, 25, 512, 64, 0, tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), 4096, 2);
   tmc4361A_set_PID(&tmc4361[0], PID_BPG0);
   // Print serial commands
-  SerialUSB.println("Syntax:");
-  SerialUSB.println("[s|S|r|R|o|O|q|Q] <index> <setpoint>");
-  SerialUSB.println("s: Set the absolute target position in units microsteps");
-  SerialUSB.println("S: Set the absolute target position in units millimeters");
-  SerialUSB.println("r: Set the relative target position in units microsteps");
-  SerialUSB.println("R: Set the relative target position in units millimeters");
-  SerialUSB.println("o: Set the absolute target position in units microsteps with anti-stick feature");
-  SerialUSB.println("O: Set the absolute target position in units millimeters with anti-stick feature");
-  SerialUSB.println("q: Set the relative target position in units microsteps with anti-stick feature");
-  SerialUSB.println("Q: Set the relative target position in units millimeters with anti-stick feature");
-
-  SerialUSB.println("[u|U] <index> <setpoint>");
-  SerialUSB.println("u: Set the target velocity in units microsteps/s");
-  SerialUSB.println("U: Set the target velocity in units millimeters/s");
-
-  SerialUSB.println("w <index> [a|A|v|V|k|K] <value>");
-  SerialUSB.println("w: indicates start of write command");
-  SerialUSB.println("a: set maximum acceleration in pulses per second^2");
-  SerialUSB.println("A: same as 'a' but in units mm per second^2");
-  SerialUSB.println("v: set maximum velocity in pulses per second");
-  SerialUSB.println("V: same as 'v' but in units mm per second");
-  SerialUSB.println("k: overwrite current position in units microsteps");
-  SerialUSB.println("K: same as 'k' but in units mm");
-
-  SerialUSB.println("b <index>");
-  SerialUSB.println("b: print ramp parameters with units microsteps and mm");
-
-  SerialUSB.println("[x|X] <index>");
-  SerialUSB.println("x: print motor position in units microsteps");
-  SerialUSB.println("X: print motor position in units millimeters");
-
-  SerialUSB.println("[t|T] <index>");
-  SerialUSB.println("t: print target position in units microsteps");
-  SerialUSB.println("T: print target position in units millimeters");
-
-  SerialUSB.println("e <index>");
-  SerialUSB.println("e: get the encoder position");
-
-  SerialUSB.println("[d|D] <dac index> <intensity>");
-  SerialUSB.println("d: set DAC output intensity (0 to 65535)");
-  SerialUSB.println("D: set DAC output voltage in volts (0 to 5)");
-
-  SerialUSB.println("n <dac index> <n steps> <n avg>");
-  SerialUSB.println("n: Lerp the piezo voltage from 0 to 5V along n steps points and report the encoder reading (averaged over 2^n)");
-
-  SerialUSB.println("[i|I] <dac index> <loop time, seconds>");
-  SerialUSB.println("i: Output a triangle wave for a given amount of time");
-  SerialUSB.println("I: Output a triangle wave for a given amount of time");
-
-  SerialUSB.println("[p|P] <index>");
-  SerialUSB.println("p: disable PID");
-  SerialUSB.println("P: enable PID");
-
-  SerialUSB.print("Index selects which motor or DAC to read, in range 1 to ");
-  SerialUSB.println(N_MOTOR);
+  //  SerialUSB.println("Syntax:");
+  //  SerialUSB.println("[s|S|r|R|o|O|q|Q] <index> <setpoint>");
+  //  SerialUSB.println("s: Set the absolute target position in units microsteps");
+  //  SerialUSB.println("S: Set the absolute target position in units millimeters");
+  //  SerialUSB.println("r: Set the relative target position in units microsteps");
+  //  SerialUSB.println("R: Set the relative target position in units millimeters");
+  //  SerialUSB.println("o: Set the absolute target position in units microsteps with anti-stick feature");
+  //  SerialUSB.println("O: Set the absolute target position in units millimeters with anti-stick feature");
+  //  SerialUSB.println("q: Set the relative target position in units microsteps with anti-stick feature");
+  //  SerialUSB.println("Q: Set the relative target position in units millimeters with anti-stick feature");
+  //
+  //  SerialUSB.println("[u|U] <index> <setpoint>");
+  //  SerialUSB.println("u: Set the target velocity in units microsteps/s");
+  //  SerialUSB.println("U: Set the target velocity in units millimeters/s");
+  //
+  //  SerialUSB.println("w <index> [a|A|v|V|k|K] <value>");
+  //  SerialUSB.println("w: indicates start of write command");
+  //  SerialUSB.println("a: set maximum acceleration in pulses per second^2");
+  //  SerialUSB.println("A: same as 'a' but in units mm per second^2");
+  //  SerialUSB.println("v: set maximum velocity in pulses per second");
+  //  SerialUSB.println("V: same as 'v' but in units mm per second");
+  //  SerialUSB.println("k: overwrite current position in units microsteps");
+  //  SerialUSB.println("K: same as 'k' but in units mm");
+  //
+  //  SerialUSB.println("b <index>");
+  //  SerialUSB.println("b: print ramp parameters with units microsteps and mm");
+  //
+  //  SerialUSB.println("[x|X] <index>");
+  //  SerialUSB.println("x: print motor position in units microsteps");
+  //  SerialUSB.println("X: print motor position in units millimeters");
+  //
+  //  SerialUSB.println("[t|T] <index>");
+  //  SerialUSB.println("t: print target position in units microsteps");
+  //  SerialUSB.println("T: print target position in units millimeters");
+  //
+  //  SerialUSB.println("e <index>");
+  //  SerialUSB.println("e: get the encoder position");
+  //
+  //  SerialUSB.println("[d|D] <dac index> <intensity>");
+  //  SerialUSB.println("d: set DAC output intensity (0 to 65535)");
+  //  SerialUSB.println("D: set DAC output voltage in volts (0 to 5)");
+  //
+  //  SerialUSB.println("[n|N|m|M] <dac index> <n steps> <n avg>");
+  //  SerialUSB.println("n: Lerp the piezo voltage from 0 to 5V along n steps points and report the encoder reading (averaged over 2^n)");
+  //  SerialUSB.println("   Prints DAC setpoint and actual encoder value");
+  //  SerialUSB.println("N: Do triange wave");
+  //  SerialUSB.println("[m|M]: same as [n|N] but lerping across the range using setpoints in units microsteps and the new modified newton's method");
+  //  SerialUSB.println("   Prints encoder value setpoint and actual encoder value");
+  //
+  //  SerialUSB.println("[i|I] <dac index> <loop time, seconds>");
+  //  SerialUSB.println("i: Output a triangle wave for a given amount of time");
+  //  SerialUSB.println("I: Output a triangle wave for a given amount of time");
+  //
+  //  SerialUSB.println("[p|P] <index>");
+  //  SerialUSB.println("p: disable PID");
+  //  SerialUSB.println("P: enable PID");
+  //
+  //  SerialUSB.print("Index selects which motor or DAC to read, in range 1 to ");
+  //  SerialUSB.println(N_MOTOR);
 }
 
 void loop() {
@@ -327,7 +336,7 @@ void loop() {
     }
     // Parse index first; if parseInt times out, index = 0
     index_max = N_MOTOR;
-    if ((cmd == 'd') || (cmd == 'D') || (cmd == 'n') || (cmd == 'N') || (cmd == 'i') || (cmd == 'I'))
+    if ((cmd == 'd') || (cmd == 'D') || (cmd == 'n') || (cmd == 'N') || (cmd == 'm') || (cmd == 'M') || (cmd == 'i') || (cmd == 'I'))
       index_max = 8;
 
     if (index <= 0 || index > index_max) {
@@ -536,29 +545,53 @@ void loop() {
         break;
       case 'n':
       case 'N':
-        target = SerialUSB.parseInt();    // number of steps
+      case 'm':
+      case 'M':
+        // Initialize variables. We are in a switch statement so we have to separate delclaration and assignment
+        bool do_triangle, do_error_correction;
+        int32_t final_target, initial_position;
+        uint32_t target_idx;
+        // Read from serial
+        target = abs(SerialUSB.parseInt());    // number of steps
         index_max = SerialUSB.parseInt(); // number of averages
 
-        for (int i = 0; i < target; i++) {
-          // set the step
-          tmp = i * u16_MAX / target;
-          dac.output(index, tmp);
-          delay(100);
+        // if N or M, double the final target so we do a triangle
+        do_triangle = ((cmd == 'N') || (cmd == 'M'));
+        final_target = do_triangle ? (target * 2) : target;
+        // Set bool for whether we are doing error corrected movement or normal movement
+        do_error_correction = ((cmd == 'm') || (cmd == 'M'));
+        // Get the initial position - used for error corrected movement
+        dac.output(index, 0);
+        delay(100);
+        initial_position = tmc4361A_read_encoder(&tmc4361[0],  index_max);
+
+        for (uint32_t i = 0; i < final_target; i++) {
+          // Triangle - if we hit the peak, wrap back around
+          if(i >= target){
+            target_idx = final_target - i - 1;
+          }
+          
+          if (!do_error_correction) {
+            // Do open-loop assuming linear behavior
+            tmp = target_idx * u16_MAX / (target-1);
+            dac.output(index, tmp);
+            delay(6);
+          }
+          else {
+            // set the step - must be negative given configuration
+            tmp = -(target_idx/(target - 1)) * tmc4361[0].dac_fullscale_msteps;
+            SerialUSB.print("0 Initial target: ");
+            SerialUSB.println(tmp);
+            // Set driver, DAC, initial position, desired expansion, and tolerated error in units usteps. We want 150 nm error - 0.00015 mm
+            piezo_set_offset(&tmc4361[0], &dac, initial_position, int32_t(tmp), tmc4361A_xmmToMicrosteps(&tmc4361[index], 0.00015)); 
+            // tmp is now the target position
+            tmp += initial_position;
+          }
           SerialUSB.print(int32_t(tmp));
           SerialUSB.print(", ");
           SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0],  index_max));
         }
-        if (cmd == 'N') {
-          for (int i = (target - 1); i >= 0; i--) {
-            // set the step
-            tmp = i * u16_MAX / target;
-            dac.output(index, tmp);
-            delay(100);
-            SerialUSB.print(int32_t(tmp));
-            SerialUSB.print(", ");
-            SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0],  index_max));
-          }
-        }
+        
         dac.output(index, 0);
         break;
       default:
