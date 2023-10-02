@@ -17,10 +17,10 @@ get_enc = 'e 1'
 #lerp_command = 'n 8 60 0'
 
 n_trials = 1
-n_steps = 512
+n_steps = 10
 
 
-tag = 'undershoot_ramp_faster_propstep5_halferror_1_80_motorstep_512'
+tag = 'undershoot_ramp_faster_propstep5_halferror_1_80_motorstep_10'
 
 def main():
     arduino_ports = [p.device for p in list_ports.comports()]
@@ -46,10 +46,11 @@ def main():
             # move to target
             motor_target = 3 - (j/(n_steps-1)) * 6
             print(f"Motor target: {motor_target} mm")
+            print(move_command + f"{motor_target:.2f}")
             # enable PID
-            arduino_serial.write(enable_pid.encode())
+            #arduino_serial.write(enable_pid.encode())
             # move to target
-            arduino_serial.write((move_command + str(motor_target)).encode())
+            arduino_serial.write((move_command + f"{motor_target:.2f}").encode())
             time.sleep(5)
             # disable PID
             arduino_serial.write(disable_pid.encode())
