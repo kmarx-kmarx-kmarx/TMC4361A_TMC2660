@@ -63,6 +63,8 @@ void tmc4361A_setVirtualStop(TMC4361ATypeDef *tmc4361A, uint8_t which, int32_t t
 int8_t tmc4361A_setVirtualLimit(TMC4361ATypeDef *tmc4361A, int dir, int32_t limit);
 void tmc4361A_disableVirtualLimitSwitch(TMC4361ATypeDef *tmc4361A, int dir);
 void tmc4361A_enableVirtualLimitSwitch(TMC4361ATypeDef *tmc4361A, int dir);
+int16_t tmc4361A_mAToCscale(float lim_mA, float rsense_ohm, bool vFS_setting);
+int16_t tmc4361A_config_init_stallGuard(TMC4361ATypeDef *tmc4361A, int8_t sensitivity, bool filter_en, uint32_t vstall_lim);
 
 // The following does not need to be accessed by the end user
 // Default motor settings - can override using tmc4361A_setPitch(), tmc4361A_setMicrosteps(), tmc4361A_setSPR()
@@ -81,6 +83,7 @@ static const uint8_t TMC2660_TMC4361A_defaultCscaleval[N_CPARAM] = {TMC2660_CSCA
 // TMC2660 register parameters
 #define SGCSCONF    0x0C0000
 #define SFILT       0x010000
+
 
 // Error handling macros
 #define NO_ERR            0

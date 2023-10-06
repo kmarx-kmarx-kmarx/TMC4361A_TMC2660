@@ -16,11 +16,11 @@ move_command = 'S 1 '
 get_enc = 'e 1'
 #lerp_command = 'n 8 60 0'
 
-n_trials = 1
-n_steps = 10
+n_trials = 512
+n_steps = 128
 
 
-tag = 'undershoot_ramp_faster_propstep5_halferror_1_80_motorstep_10'
+tag = 'undershoot_ramp_faster_propstep5_halferror_512_first_last_fullrange_motorstep_128'
 
 def main():
     arduino_ports = [p.device for p in list_ports.comports()]
@@ -59,7 +59,7 @@ def main():
             arduino_serial.flushOutput()
             time.sleep(5)
 
-            for _ in trange(n_trials):
+            for i in trange(n_trials):
                 arduino_serial.write(lerp_command.encode())
 
                 with tqdm(desc="Receiving", unit=" lines", total=512) as pbar:
@@ -68,8 +68,9 @@ def main():
                         line = arduino_serial.readline()
                         if line:
                             line = line.decode("utf-8")
-                            if ',' in line:
-                                file.write(line)
+                            if ',' in line: # only save first and last trials to csv
+                                if (i == 0 or i == (n_trials - 1)):
+                                    file.write(line)
                                 pbar.update(1)
                         else:
                             n_fault += 1

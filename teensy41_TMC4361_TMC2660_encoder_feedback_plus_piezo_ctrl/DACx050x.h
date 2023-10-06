@@ -72,6 +72,7 @@
 
 // DAC Channel 
 #define DACx050x_CHANNEL 0b1000 // add the channel number to this
+#define DACx050x_NUM_CHANNEL 8
 // DAC field is just 12-16 bit output
 
 
@@ -91,6 +92,7 @@ class DACx050x {
     void begin(SPIClass &port);
     // void set_gain(uint8_t gain, uint8_t channel_bits);
     void output(uint8_t channel_num, uint16_t value);
+    uint16_t get_setpoint(uint8_t channel_num);
     uint16_t write(uint8_t reg, uint16_t data);
     void reset();
 
@@ -98,6 +100,7 @@ class DACx050x {
     SPIClass *spi_;
     uint8_t cs_;
     SPISettings settings_;
+    uint16_t setpoints[DACx050x_NUM_CHANNEL];
 };
 
 #endif /*DACx050x_H*/

@@ -58,8 +58,8 @@ uint32_t pid_check_time = 0;
 #define N_TESTPOINTS 3 // for linearity test
 #define DO_LINEARITY_TEST false
 
-void trianglewave(int32_t dac_idx, int32_t time_ms);
-void squarewave(int32_t dac_idx, int32_t time_ms);
+void trianglewave(int32_t dac_idx, uint32_t time_ms);
+void squarewave(int32_t dac_idx, uint32_t time_ms);
 
 // Configs and motor structs
 ConfigurationTypeDef tmc4361_configs[N_MOTOR];
@@ -93,7 +93,7 @@ void setup() {
   // Initialize SPI - included in Utils.h
   SPI.begin();
   // Give some time to finish initialization before using the SPI bus
-  delayMicroseconds(50);
+  delayMicroseconds(5000);
   // Initialize the DAC
   dac.begin(SPI);
 
@@ -102,6 +102,7 @@ void setup() {
     // set up ICs with SPI control and other parameters
     tmc4361A_tmc2660_init(&tmc4361[i], clk_Hz_TMC4361);
     // enable limit switch reading
+    delayMicroseconds(100);
     tmc4361A_enableLimitSwitch(&tmc4361[i], rht_sw_pol[i], RGHT_SW, false);
     tmc4361A_enableLimitSwitch(&tmc4361[i], lft_sw_pol[i], LEFT_SW, false);
   }
@@ -168,7 +169,7 @@ void setup() {
   tmc4361A_enableHomingLimit(&tmc4361[0], rht_sw_pol[0], TMC4361_homing_sw[0]);
   // Perform homing
   SerialUSB.println("Begin inward (right)");
-  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm), RGHT_DIR);
+  tmc4361A_moveToExtreme(&tmc4361[0], tmc4361A_vmmToMicrosteps(&tmc4361[0], MAX_VELOCITY_Z_mm/4), RGHT_DIR);
   tmc4361A_setCurrentPosition(&tmc4361[0], 0);
 
   // Move to the center - set the middle as home so distance can range from +3mm to -3 mm
@@ -178,7 +179,7 @@ void setup() {
   tmc4361A_moveTo(&tmc4361[0], target);
   // Wait until we reach our target
   while (tmc4361A_currentPosition(&tmc4361[0]) != target) {
-    delay(50);
+  delay(50);
   }
   // Our center position is home, set to 0
   tmc4361A_setCurrentPosition(&tmc4361[0], 0);
@@ -196,7 +197,7 @@ void setup() {
   // Synchronize encoder and microsteps
   tmc4361A_setCurrentPosition(&tmc4361[0], tmc4361A_read_encoder(&tmc4361[0], N_ENC_AVG_EXP));
   // Calibrate the piezo
-  piezo_calibrate_limits(&tmc4361[0], &dac, 1);
+  piezo_calibrate_limits(&tmc4361[0], &dac, 10);
   SerialUSB.print("Calibrated piezo: ");
   SerialUSB.println(tmc4361[0].dac_fullscale_msteps);
 
@@ -522,7 +523,7 @@ void loop() {
         break;
 
       case 'e':
-        SerialUSB.print("Encoder reading: ");
+        // SerialUSB.print("Encoder reading: ");
         SerialUSB.println(tmc4361A_read_encoder(&tmc4361[index],  N_ENC_AVG_EXP));
         break;
       case 'D':
@@ -550,9 +551,10 @@ void loop() {
         // Initialize variables. We are in a switch statement so we have to separate delclaration and assignment
         bool do_triangle, do_error_correction;
         int32_t final_target, initial_position;
-        uint32_t target_idx;
+        uint32_t target_idx, t0;
+        bool result;
         // Read from serial
-        target = abs(SerialUSB.parseInt());    // number of steps
+        target = abs(SerialUSB.parseInt());    // number of steps - must be at least 2
         index_max = SerialUSB.parseInt(); // number of averages
 
         // if N or M, double the final target so we do a triangle
@@ -565,33 +567,33 @@ void loop() {
         delay(100);
         initial_position = tmc4361A_read_encoder(&tmc4361[0],  index_max);
 
-        for (uint32_t i = 0; i < final_target; i++) {
+        //SerialUSB.print("Allowed error (ustep): ");
+        //SerialUSB.println(tmc4361A_xmmToMicrosteps(&tmc4361[0], 0.000015));
+        for (int32_t i = 0; i < final_target; i++) {
           // Triangle - if we hit the peak, wrap back around
-          if(i >= target){
+          target_idx = i;
+          if (i >= target) {
             target_idx = final_target - i - 1;
           }
-          
-          if (!do_error_correction) {
-            // Do open-loop assuming linear behavior
-            tmp = target_idx * u16_MAX / (target-1);
-            dac.output(index, tmp);
-            delay(6);
-          }
-          else {
-            // set the step - must be negative given configuration
-            tmp = -(target_idx/(target - 1)) * tmc4361[0].dac_fullscale_msteps;
-            SerialUSB.print("0 Initial target: ");
-            SerialUSB.println(tmp);
-            // Set driver, DAC, initial position, desired expansion, and tolerated error in units usteps. We want 150 nm error - 0.00015 mm
-            piezo_set_offset(&tmc4361[0], &dac, initial_position, int32_t(tmp), tmc4361A_xmmToMicrosteps(&tmc4361[index], 0.00015)); 
-            // tmp is now the target position
-            tmp += initial_position;
-          }
+          // set the step - must be negative given configuration
+          tmp = -(float(target_idx) / (float(target) - 1)) * float(tmc4361[0].dac_fullscale_msteps) * (10.0/10.0); // 80% scaling done here - replace numerator with 8.0
+          //            SerialUSB.print("Initial target (mstep): ");
+          //            SerialUSB.println(tmp);
+          // Set driver, DAC, initial position, desired expansion, and tolerated error in units usteps. We want 150 nm error - 0.00015 mm
+          t0 = millis();
+          result = piezo_set_offset(&tmc4361[0], &dac, initial_position, int32_t(tmp), tmc4361A_xmmToMicrosteps(&tmc4361[0], 0.000015), do_error_correction);
+          t0 = millis() - t0;
+          // tmp is now the target position
+          tmp += initial_position;
+          SerialUSB.print(initial_position);
+          SerialUSB.print(",");
           SerialUSB.print(int32_t(tmp));
           SerialUSB.print(", ");
-          SerialUSB.println(tmc4361A_read_encoder(&tmc4361[0],  index_max));
+          SerialUSB.print(tmc4361A_read_encoder(&tmc4361[0],  index_max));
+          SerialUSB.print(", ");
+          SerialUSB.println(t0);
         }
-        
+
         dac.output(index, 0);
         break;
       default:
@@ -654,16 +656,16 @@ void loop() {
     pid_check_time = millis();
     for (int i = 0; i < N_MOTOR; i++) {
       deviation = abs(tmc4361A_read_deviation(&tmc4361[i]));
-      if ((deviation >= PID_DEVIATION_ERROR) || (tmc4361A_readLimitSwitches(&tmc4361[0]) != 0)) {
-        SerialUSB.println(deviation);
-        tmc4361A_stop(&tmc4361[i]);
-        tmc4361A_set_PID(&tmc4361[i], PID_DISABLE);
-        SerialUSB.print("PID disabled for motor ");
-        SerialUSB.print(i + 1);
-        SerialUSB.print(". Re-enable with 'P ");
-        SerialUSB.print(i + 1);
-        SerialUSB.println("'.");
-      }
+//      if ((deviation >= PID_DEVIATION_ERROR) || (tmc4361A_readLimitSwitches(&tmc4361[0]) != 0)) {
+//        SerialUSB.println(deviation);
+//        tmc4361A_stop(&tmc4361[i]);
+//        tmc4361A_set_PID(&tmc4361[i], PID_DISABLE);
+//        SerialUSB.print("PID disabled for motor ");
+//        SerialUSB.print(i + 1);
+//        SerialUSB.print(". Re-enable with 'P ");
+//        SerialUSB.print(i + 1);
+//        SerialUSB.println("'.");
+//      }
     }
 
     // Also get stop switches
@@ -672,7 +674,7 @@ void loop() {
   }
 }
 
-void trianglewave(int32_t dac_idx, int32_t time_ms) {
+void trianglewave(int32_t dac_idx, uint32_t time_ms) {
   uint32_t t0 = millis();
   uint32_t intensity = 0;
   while ((millis() - t0) < time_ms) {
@@ -686,7 +688,7 @@ void trianglewave(int32_t dac_idx, int32_t time_ms) {
   delay(500);
   dac.output(dac_idx, 0);
 }
-void squarewave(int32_t dac_idx, int32_t time_ms) {
+void squarewave(int32_t dac_idx, uint32_t time_ms) {
   uint32_t t0 = millis();
   while ((millis() - t0) < time_ms) {
     dac.output(dac_idx, u16_MAX);

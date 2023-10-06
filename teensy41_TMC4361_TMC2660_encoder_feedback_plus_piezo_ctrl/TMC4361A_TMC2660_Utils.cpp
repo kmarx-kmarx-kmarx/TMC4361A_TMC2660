@@ -87,6 +87,8 @@
           Arguments: TMC4361ATypeDef *tmc4361A, uint8_t idx, int32_t param
       tmc4361A_adjustBows:              Sets shared bow values based on velocity and acceleration
           Arguments: TMC4361ATypeDef *tmc4361A
+      tmc4361A_mAToCscale:              Convert from mA current limit to cscale value
+          Arguments: float lim_mA, float rsense_ohm, bool vFS_setting
 */
 #include "TMC4361A_TMC2660_Utils.h"
 
@@ -212,7 +214,7 @@ void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   DESCRIPTION: tmc4361A_cScaleInit() writes current scale parameters to the TCM4361A and TMC2660
 
   OPERATION:   We first write the current scale to the TMC2660 then write hold, drive, and boost scale parameters to the TCM4361A. The values being written are stored in *tmc4361A.
-
+              
   ARGUMENTS:
       TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
 
@@ -231,7 +233,6 @@ void tmc4361A_rstBits(TMC4361ATypeDef *tmc4361A, uint8_t address, int32_t dat) {
   -----------------------------------------------------------------------------
 */
 void tmc4361A_cScaleInit(TMC4361ATypeDef *tmc4361A) {
-  tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, SGCSCONF | SFILT | tmc4361A->cscaleParam[CSCALE_IDX]);
   // current open loop scaling
   tmc4361A_writeInt(tmc4361A, TMC4361A_SCALE_VALUES, (tmc4361A->cscaleParam[HOLDSCALE_IDX] << TMC4361A_HOLD_SCALE_VAL_SHIFT) +   // Set hold scale value (0 to 255)
                     (tmc4361A->cscaleParam[DRV2SCALE_IDX] << TMC4361A_DRV2_SCALE_VAL_SHIFT) +   // Set DRV2 scale  (0 to 255)
@@ -874,6 +875,7 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
     tmc4361A_setSpeed(tmc4361A, vel * LEFT_DIR);
     while (eventstate == RGHT_SW) {
       eventstate = tmc4361A_readLimitSwitches(tmc4361A);
+      eventstate |= tmc4361A_readLimitSwitches(tmc4361A);
       delay(5);
     }
     delay(300);
@@ -884,6 +886,7 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
     tmc4361A_setSpeed(tmc4361A, vel * RGHT_DIR);
     while (eventstate == LEFT_SW) {
       eventstate = tmc4361A_readLimitSwitches(tmc4361A);
+      eventstate |= tmc4361A_readLimitSwitches(tmc4361A);
       delay(5);
     }
     delay(300);
@@ -896,9 +899,9 @@ void tmc4361A_moveToExtreme(TMC4361ATypeDef *tmc4361A, int32_t vel, int8_t dir) 
   tmc4361A_setSpeed(tmc4361A, vel);
   // Keep moving until we get a switch event or switch status
   while (((eventstate != RGHT_SW) && (dir == RGHT_DIR)) || ((eventstate != LEFT_SW) && (dir == LEFT_DIR))) {
-    delay(5);
     eventstate = tmc4361A_readSwitchEvent(tmc4361A );
     eventstate |= tmc4361A_readLimitSwitches(tmc4361A);
+    delay(5);
   }
   // When we do get a switch event, write the latched X
   if (dir == RGHT_DIR) {
@@ -2006,4 +2009,95 @@ int8_t tmc4361A_move_no_stick(TMC4361ATypeDef *tmc4361A, int32_t x_pos, int32_t 
   int32_t target = current + x_pos;
 
   return tmc4361A_moveTo_no_stick(tmc4361A, target, backup_amount, err_thresh, timeout_ms);
+}
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_mAToCscale() converts a desired current limit to a cscale value for the TMC4361A
+
+  OPERATION:   We use the formula cscale = imax/1000 * (256 * rsense)/Vfs - 1. imax is the maximum current in milliamps, rsense is the value of the sense resistor, and Vfs is the full scale value of the ADC. 
+               If the Vfs bit is 0, then Vfs = 310 mV, if it's 1 then Vfs = 165 mV.
+
+               TODO: Move the rsense_ohm and vFS_setting into the struct
+
+  ARGUMENTS:
+      float lim_mA:      maxiumum desired current through the motor in mA
+      float rsense_ohm:  value of the sense resistor in ohms
+      bool vFS_setting:  the current setting of the full scale voltage
+
+  RETURNS:
+      int16_t cscale: Returns a value [0..255] if the computation was valid. Otherwise, return a value above 255 if cscale was too high (suggest using a larger vFS or smaller resistor) or a value less than 0 of cscale is too low (suggest using a smaller vFS or larger resistor)
+
+  INPUTS / OUTPUTS: None
+  
+  LOCAL VARIABLES: None
+
+  SHARED VARIABLES: None
+
+  GLOBAL VARIABLES: None
+
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
+int16_t tmc4361A_mAToCscale(float lim_mA, float rsense_ohm, bool vFS_setting){
+  float vFS = (vFS_setting) ? 0.165 : 3.10;
+  int16_t cscale = (1000 * lim_mA) * (256.0) * (rsense_ohm / vFS) - 1;
+  return cscale
+}
+
+/*
+  -----------------------------------------------------------------------------
+  DESCRIPTION: tmc4361A_config_init_stallGuard() initializes stall prevention on the TMC4316A and TMC2660
+
+  OPERATION:   First, check if arugments are within bounds. If the argument exceed the bounds, constrain them before writing the values, and note that this function failed.
+               We then write the sensitivitity to the TMC2660.
+               
+
+  ARGUMENTS:
+      TMC4361ATypeDef *tmc4361A: Pointer to a struct containing motor driver info
+      int8_t sensitivity: Value from -64 to +63 indicating sensitivity to stall condition. Larger values are less sensitive.
+      bool filter_en: Set true to use filter (more accurate, slower).
+      uint32_t vstall_lim: 24-bit value. The internal ramp velocity is set immediately to 0 whenever a stall is detected and |VACTUAL| >VSTALL_LIMIT.
+
+  RETURNS: 
+      bool success: return true if there were no errors
+
+  INPUTS / OUTPUTS: Sends signals over SPI
+  
+  LOCAL VARIABLES: None
+
+  SHARED VARIABLES: 
+      TMC4361ATypeDef *tmc4361A: Values are read from the struct
+
+  GLOBAL VARIABLES: None
+
+  DEPENDENCIES: tmc4316A.h
+  -----------------------------------------------------------------------------
+*/
+int16_t tmc4361A_config_init_stallGuard(TMC4361ATypeDef *tmc4361A, int8_t sensitivity, bool filter_en, uint32_t vstall_lim){
+  // First, ensure values are within limits
+  bool success = true;
+  if((sensitivity > 63) || (sensitivity < -64) || (vstall_lim >= (1<<24))){
+    success = false;
+  }
+  sensitivity = constrain(sensitivity, -64, 63);
+  vstall_lim = constrain(vstall_lim, 0, ((1<<24)-1));
+  // Mask the high bit
+  sensitivity = sensitivity & 0x7F;
+  // Build the datagram
+  uint32_t datagram = 0;
+  datagram = filter_en ? SFILT : 0;
+  datagram |= SGCSCONF;
+  datagram |= (sensitivity << 8);
+  // Next, write to the TMC2660 - write to the "cover_low" register
+  tmc4361A_writeInt(tmc4361A, TMC4361A_COVER_LOW_WR, datagram);
+  // Enable stall detection on the TMC4316A
+  // set vstall limit
+  tmc4361A_writeInt(tmc4361A, TMC4361A_VSTALL_LIMIT_WR, vstall_lim);
+  // enable stop on stall
+  tmc4361A_setBits(tmc4361A, TMC4361A_REFERENCE_CONF, TMC4361A_STOP_ON_STALL_MASK);
+  // disable drive after stall
+  tmc4361A_rstBits(tmc4361A, TMC4361A_REFERENCE_CONF, TMC4361A_DRV_AFTER_STALL_MASK);
+
+  return success;
 }

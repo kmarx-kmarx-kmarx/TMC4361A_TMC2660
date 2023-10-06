@@ -55,6 +55,10 @@
 */
 DACx050x::DACx050x(uint8_t cs)
   : cs_(cs) {
+  // Clear the setpoints array
+  for(uint8_t i = 0; i < DACx050x_NUM_CHANNEL; i++){
+    setpoints[i] = 0;
+  }
   return;
 }
 
@@ -149,9 +153,17 @@ void DACx050x::begin(SPIClass &port) {
 
 void DACx050x::output(uint8_t channel_num, uint16_t value) {
   uint8_t addr = 0b1000 | channel_num;
+  setpoints[channel_num] = value;
   this->write(addr, value);
 }
 
+uint16_t DACx050x::get_setpoint(uint8_t channel_num){
+  return setpoints[channel_num];
+}
+
 void DACx050x::reset() {
+  for(uint8_t i = 0; i < DACx050x_NUM_CHANNEL; i++){
+    setpoints[i] = 0;
+  }
   this->write(DACx050x_TRIGGER, DACx050x_SOFT_RST);
 }
